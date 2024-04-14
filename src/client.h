@@ -1,3 +1,6 @@
+#ifndef CLIENT_H
+#define CLIENT_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -11,78 +14,93 @@
 #define SERVER_PORT 12345
 #define PACKET_SIZE 1024
 #define NUM_PACKETS 100
-#define THRESHOLD 100 // Threshold in milliseconds
 
 /**
  * @brief Represents the client side of the network compression detection application
  *
  */
-class Client
+typedef struct
 {
-private:
+    /** Socket object */
     int sockfd;
+
+    /** IPv4 socker server address */
     struct sockaddr_in serv_addr;
+
+    /** Variable hold message */
     char buffer[PACKET_SIZE];
 
-public:
-    Client()
-    {
-        // Create UDP socket
-        if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-            error("Error opening socket");
+    /** Send confirmation */
+    int len;
 
-        // Initialize server address struct
-        memset(&serv_addr, 0, sizeof(serv_addr));
-        serv_addr.sin_family = AF_INET;
-        serv_addr.sin_port = htons(SERVER_PORT);
-        if (inet_pton(AF_INET, "127.0.0.1", &serv_addr.sin_addr) <= 0)
-            error("Invalid address");
+} Client;
+
+void start_client(Client *client)
+{
+    if (client == NULL)
+    {
+        error("Error initializing Server: Memory allocation failed");
     }
 
-    ~Client()
+    // Create UDP socket as IPv4
+    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (sockfd < 0)
     {
-        close(sockfd);
+        perror("Error opening socket");
+        exit(EXIT_FAILURE);
     }
 
-    /**
-     * @brief
-     */
-    void sendPackets()
+    // Initialize server address struct
+    memset(&client->serv_addr, 0, sizeof(client->serv_addr));
+    client->serv_addr.sin_family = AF_INET;
+    client->serv_addr.sin_port = htons(SERVER_PORT);
+    if (inet_pton(AF_INET, "127.0.0.1", &client->serv_addr.sin_addr) <= 0)
     {
-        // Send first packet train (all 0's)
-        memset(buffer, 0, PACKET_SIZE);
-        if (sendto(sockfd, buffer, PACKET_SIZE, 0, (const struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-            error("Error sending first packet train");
-
-        // Send second packet train (random bits)
-        FILE *urandom = fopen("/dev/urandom", "r");
-        fread(buffer, sizeof(char), PACKET_SIZE, urandom);
-        fclose(urandom);
-
-        if (sendto(sockfd, buffer, PACKET_SIZE, 0, (const struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-            error("Error sending second packet train");
+        perror("Invalid address");
     }
-};
+}
+
+/**
+ * @brief Sends a packet train, with the message
+ *
+ * @param client this client object
+ * @param msg message
+ * @return int 0 if recieved successful, -1 otherwise
+ */
+int send_packet(Client *client, char *msg)
+{
+    client->len = sendto(client->sockfd, msg, PACKET_SIZE, 0,
+                         (const struct sockaddr *)&client->serv_addr, sizeof(client->serv_addr));
+
+    if (client->len < 0)
+    {
+        error("Error sending second packet train");
+        return -1;
+    }
+
+    return 0;
+}
 
 /**
  * @brief Generates the given error message
  *
- * @param msg
+ * @param msg error message
  */
 void error(const char *msg)
 {
     perror(msg);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
 /**
- * @brief Get the time object
+ * @brief Closes the client object
  *
- * @return double
+ * @param client struct
  */
-double get_time()
+void close(Client *client)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+    close(client->sockfd);
+    free(client);
 }
+
+#endif

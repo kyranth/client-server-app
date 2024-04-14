@@ -1,3 +1,6 @@
+#ifndef SERVER_H
+#define SERVER_H
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,75 +20,91 @@
  * @brief Represents the server side of the network compression detection application
  *
  */
-class Server
+typedef struct
 {
-private:
+    /** Socket object */
     int sockfd;
-    struct sockaddr_in serv_addr, cli_addr;
+
+    /** IPv4 socket address */
+    struct sockaddr_in servaddr;
+
+    /** Message len */
     socklen_t clilen;
+
+    /** Buffere told hold message */
     char buffer[PACKET_SIZE];
-    double start_time_low, end_time_low;
 
-public:
-    /**
-     * @brief Construct a new Server objectConstructor method for initializing the server.
-     *
-     */
-    Server()
+    /** Time variables */
+    double start_time, end_time;
+} Server;
+
+/**
+ * @brief Initialize the server
+ *
+ * @return Server pointer
+ */
+void start_server(Server *server)
+{
+    if (server == NULL)
     {
-        // Create UDP socket
-        if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
-            error("Error opening socket");
-
-        // Initialize server address struct
-        memset(&serv_addr, 0, sizeof(serv_addr));
-        serv_addr.sin_family = AF_INET;
-        serv_addr.sin_addr.s_addr = htonl(INADDR_ANY);
-        serv_addr.sin_port = htons(SERVER_PORT);
-
-        // Bind socket to server address
-        if (bind(sockfd, (struct sockaddr *)&serv_addr, sizeof(serv_addr)) < 0)
-            error("Error binding");
-
-        clilen = sizeof(cli_addr);
+        perror("Error initializing Server: Memory allocation failed");
     }
 
-    /**
-     * @brief Clean up the Server object. Destructor method for cleaning up resources used by the server.
-     *
-     */
-    ~Server()
+    // Create UDP socket
+    server->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    if (server->sockfd < 0)
     {
-        close(sockfd);
+        perror("Error opening socket");
+        exit(EXIT_FAILURE);
     }
 
-    /**
-     * @brief Receives two sets of UDP packets from the client.
-     *
-     */
-    void receivePackets()
-    {
-        // Receive first packet train (all 0's)
-        if (recvfrom(sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr *)&cli_addr, &clilen) < 0)
-            error("Error receiving first packet train");
-        start_time_low = get_time(); // Record start time
+    // Initialize server address struct
+    memset(&server->servaddr, 0, sizeof(server->servaddr));
+    server->servaddr.sin_family = AF_INET;
+    server->servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // Default interface
+    server->servaddr.sin_port = htons(SERVER_PORT);
+}
 
-        // Receive second packet train (random bits)
-        if (recvfrom(sockfd, buffer, PACKET_SIZE, 0, (struct sockaddr *)&cli_addr, &clilen) < 0)
-            error("Error receiving second packet train");
-        end_time_low = get_time(); // Record end time
+/**
+ * @brief Receives two sets of UDP packets from the client.
+ *
+ * @param server this object pointer
+ * @return int 0 if recieved successful, -1 otherwise
+ */
+int receive_packet(Server *server)
+{
+    int rc = bind(server->sockfd, (const struct sockaddr *)&server->servaddr,
+                  sizeof(server->servaddr));
+
+    if (rc == -1)
+    {
+        perror("Failed to bind");
+        close(server->sockfd);
+        exit(EXIT_FAILURE);
     }
-};
+    server->clilen = 0;
+    int n = recvfrom(server->sockfd, server->buffer, PACKET_SIZE, 0,
+                     (struct sockaddr *)&server->servaddr, &server->clilen);
+
+    server->buffer[n] = '\n';
+    printf("%s", server->buffer);
+    return 0;
+}
 
 void error(const char *msg)
 {
     perror(msg);
-    exit(1);
+    exit(EXIT_FAILURE);
 }
 
-double get_time()
+/**
+ * @brief Clean up the Server object. Destructor method for cleaning up resources used by the server.
+ *
+ */
+void close(Server *server)
 {
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (double)tv.tv_sec * 1000.0 + (double)tv.tv_usec / 1000.0;
+    close(server->sockfd);
+    free(server);
 }
+
+#endif

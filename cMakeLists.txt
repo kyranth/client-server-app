@@ -2,11 +2,4 @@ cmake_minimum_required(VERSION 3.10)
 project(project)
 
 # Add executable target
-add_executable(standalone standalone.c)
-
-# Optional: Set C standard
-set_property(TARGET my_executable PROPERTY C_STANDARD 11)
-
-# Optional: Set compilation flags
-# For example, to enable all warnings and treat them as errors:
-# target_compile_options(my_executable PRIVATE -Wall -Werror)
+add_executable(${PROJECT_NAME} standalone.c)

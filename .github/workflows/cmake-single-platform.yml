@@ -23,7 +23,7 @@ jobs:
     - name: Configure and Build Project
       uses: threeal/cmake-action@main
       with:
-        source-dir: src
+        source-dir: .
         build-dir: build
         generator: Ninja
         c-compiler: gcc

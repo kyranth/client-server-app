@@ -1,8 +1,8 @@
-*settings.json
+*.vscode
 
 *build
 
-# Package Files #
+# Packaged Files #
 *.jar
 *.war
 *.nar

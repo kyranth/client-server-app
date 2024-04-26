@@ -13,7 +13,7 @@
 #define PACKET_SIZE 1024
 
 /**
- * @brief Represents the server side of the network compression detection application
+ * @brief Represents the server side of the network.
  *
  */
 typedef struct
@@ -35,14 +35,15 @@ typedef struct
 } Server;
 
 /**
- * @brief Initialize the server
+ * @brief Initializes the server. Sets up the
  *
+ * @param *server object
  */
 void start_server(Server *server)
 {
     if (server == NULL)
     {
-        perror("Error initializing Server");
+        perror("ERROR: initializing Server\n");
     }
 
     /** Configure Server struct sockaddr_in */
@@ -54,14 +55,14 @@ void start_server(Server *server)
     server->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (server->sockfd < 0)
     {
-        perror("Error opening socket");
+        perror("ERROR: opening socket\n");
         exit(EXIT_FAILURE);
     }
 
-    /** Bind server address to socket descriptor */
+    /** Bind server address to socket */
     if (bind(server->sockfd, (struct sockaddr *)&server->servaddr, sizeof(server->servaddr)) < 0)
     {
-        perror("Bind failed");
+        perror("ERROR: Bind failed\n");
         exit(EXIT_FAILURE);
     }
 }
@@ -76,7 +77,7 @@ int receive_packet(Server *server)
 {
     while (1)
     {
-        printf("Listening for pakcets...");
+        printf("Listening for pakcets...\n");
         socklen_t len = sizeof(server->cliaddr);
         ssize_t n = recvfrom(server->sockfd, (char *)server->buffer, PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, &len);
         server->buffer[n] = '\0';

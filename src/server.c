@@ -5,9 +5,11 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
-#include <netinet/in.h>
 
-#define SERVER_PORT 12345
+/** Constant members */
+#define SERVER_IP "127.0.0.1" // Update for server address
+#define SERVER_PORT 8765
+#define CLIENT_PORT 9876
 #define PACKET_SIZE 1024
 
 /**
@@ -35,7 +37,6 @@ typedef struct
 /**
  * @brief Initialize the server
  *
- * @return Server pointer
  */
 void start_server(Server *server)
 {
@@ -44,19 +45,12 @@ void start_server(Server *server)
         perror("Error initializing Server");
     }
 
-    // Set server address to 0s
-    memset(&server->servaddr, 0, sizeof(server->servaddr));
+    /** Configure Server struct sockaddr_in */
+    server->servaddr.sin_family = AF_INET;                // IPv4
+    server->servaddr.sin_port = htons(SERVER_PORT);       // Server port
+    server->servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // Set to default interface
 
-    // IPv4
-    server->servaddr.sin_family = AF_INET;
-
-    // Server port
-    server->servaddr.sin_port = htons(SERVER_PORT);
-
-    // Set to default interface
-    server->servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-
-    // Create UDP socket
+    /** Create UDP socket */
     server->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (server->sockfd < 0)
     {
@@ -64,8 +58,12 @@ void start_server(Server *server)
         exit(EXIT_FAILURE);
     }
 
-    // bind server address to socket descriptor
-    bind(server->sockfd, (struct sockaddr *)&server->servaddr, sizeof(server->servaddr));
+    /** Bind server address to socket descriptor */
+    if (bind(server->sockfd, (struct sockaddr *)&server->servaddr, sizeof(server->servaddr)) < 0)
+    {
+        perror("Bind failed");
+        exit(EXIT_FAILURE);
+    }
 }
 
 /**
@@ -76,17 +74,40 @@ void start_server(Server *server)
  */
 int receive_packet(Server *server)
 {
-    server->clilen = 0;
-
-    // Receive
-    int n = recvfrom(server->sockfd, server->buffer, PACKET_SIZE, 0, (struct sockaddr *)&server->servaddr, &server->clilen);
-
-    server->buffer[n] = '\0';
-    printf("%s", server->buffer);
+    while (1)
+    {
+        printf("Listening for pakcets...");
+        socklen_t len = sizeof(server->cliaddr);
+        ssize_t n = recvfrom(server->sockfd, (char *)server->buffer, PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, &len);
+        server->buffer[n] = '\0';
+        printf("Client: %s\n", server->buffer);
+    }
 
     // send the response
     sendto(server->sockfd, "msg recieved", PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, sizeof(server->cliaddr));
     return 0;
+}
+
+void write_file(int sockfd)
+{
+    int n;
+    FILE *fp;
+    char *filename = "config.json";
+    char buffer[PACKET_SIZE];
+
+    fp = fopen(filename, "w");
+    while (1)
+    {
+        n = recv(sockfd, buffer, PACKET_SIZE, 0);
+        if (n <= 0)
+        {
+            break;
+            return;
+        }
+        fprintf(fp, "%s", buffer);
+        bzero(buffer, PACKET_SIZE);
+    }
+    return;
 }
 
 int main()

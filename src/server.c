@@ -89,14 +89,23 @@ int receive_packet(Server *server)
     return 0;
 }
 
-void write_file(int sockfd)
+/**
+ * @brief Writes incoming file to given filename from socket connection object.
+ *
+ * @param sockfd object
+ */
+void write_file(int sockfd, const char *file)
 {
     int n;
-    FILE *fp;
-    char *filename = "config.json";
     char buffer[PACKET_SIZE];
 
-    fp = fopen(filename, "w");
+    FILE *fp = fopen(file, "wb");
+    if (file == NULL)
+    {
+        perror("ERROR: Couldn't open file");
+        return;
+    }
+
     while (1)
     {
         n = recv(sockfd, buffer, PACKET_SIZE, 0);

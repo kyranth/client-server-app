@@ -9,10 +9,10 @@ CFLAGS=-g -Wall -std=c99
 all: client server
 
 client: client.c
-	$(CC) $(CFLAGS) -o client client.c
+	$(CC) $(CFLAGS) -o ../bin/client client.c
 
 server: server.c
-	$(CC) $(CFLAGS) -o server server.c
+	$(CC) $(CFLAGS) -o ../bin/server server.c
 
 clean:
-	rm -f client server
+	rm -f ../bin/client ../bin/server

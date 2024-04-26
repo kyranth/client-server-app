@@ -6,8 +6,14 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/ip.h>  // For IP_HDRINCL
+#include <netinet/udp.h> // For UDP header
 
-#define SERVER_PORT 12345
+/** Constant members */
+#define SERVER_IP "127.0.0.1" // Update for server address
+#define CLIENT_IP "127.0.0.2" // Update for client address
+#define SERVER_PORT 8765
+#define CLIENT_PORT 9876
 #define PACKET_SIZE 1024
 
 /**
@@ -19,37 +25,28 @@ typedef struct
     /** Socket object */
     int sockfd;
 
-    /** IPv4 socker server address */
-    struct sockaddr_in servaddr;
-
     /** Variable hold message */
-    char buffer[PACKET_SIZE];
+    char msg_buffer[PACKET_SIZE];
 
-    /** Send confirmation */
-    int len;
-
+    /** IPv4 socker server address */
+    struct sockaddr_in servaddr, cliaddr;
 } Client;
 
 void start_client(Client *client)
 {
     if (client == NULL)
-    {
         perror("Error initializing Client");
-    }
 
-    // Set the server address to all 0s
-    memset(&client->servaddr, 0, sizeof(client->servaddr));
+    memset(&client->servaddr, 0, sizeof(client->servaddr)); // Set the server address to all 0s
+    client->servaddr.sin_family = AF_INET;                  // IPv4 protocol
+    client->servaddr.sin_port = htons(SERVER_PORT);         // Setting server port
+    client->servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
 
-    // IPv4 protocol
-    client->servaddr.sin_family = AF_INET;
+    memset(&client->cliaddr, 0, sizeof(client->cliaddr));
+    client->cliaddr.sin_family = AF_INET;
+    client->cliaddr.sin_port = htons(CLIENT_PORT);
+    client->cliaddr.sin_addr.s_addr = inet_addr(CLIENT_IP);
 
-    // Setting server port
-    client->servaddr.sin_port = htons(SERVER_PORT);
-
-    // Set the IP address
-    client->servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-
-    // Create UDP socket as IPv4
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0)
     {
@@ -57,11 +54,9 @@ void start_client(Client *client)
         exit(EXIT_FAILURE);
     }
 
-    if (connect(client->sockfd, (struct sockaddr *)&client->servaddr, sizeof(client->servaddr)) < 0)
-    {
-        printf("\nError: Failed to connect\n");
-        exit(EXIT_FAILURE);
-    }
+    int DF = IP_PMTUDISC_DO; // Don't fragment
+    setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &DF, sizeof(DF));
+    bind(sockfd, (const struct sockaddr *)&client->cliaddr, sizeof(client->cliaddr));
 }
 
 /**
@@ -74,18 +69,29 @@ void start_client(Client *client)
 int send_packet(Client *client, char *msg)
 {
     // Send meessage
-    client->len = sendto(client->sockfd, msg, PACKET_SIZE, 0, (const struct sockaddr *)&client->servaddr, sizeof(client->servaddr));
-    if (client->len < 0)
-    {
-        perror("Error: failed to send");
-        return -1;
-    }
+    sendto(client->sockfd, msg, PACKET_SIZE, 0, (const struct sockaddr *)&client->servaddr, sizeof(client->servaddr));
 
     // waiting for response
-    recvfrom(client->sockfd, client->buffer, sizeof(client->buffer), 0, (struct sockaddr *)NULL, NULL);
+    recvfrom(client->sockfd, client->msg_buffer, sizeof(client->msg_buffer), 0, (struct sockaddr *)NULL, NULL);
 
-    puts(client->buffer);
+    puts(client->msg_buffer);
     return 0;
+}
+
+void send_file(FILE *file, int sockfd)
+{
+    int n;
+    char data[PACKET_SIZE] = {0};
+
+    while (fgets(data, PACKET_SIZE, file) != NULL)
+    {
+        if (send(sockfd, data, sizeof(data), 0) == -1)
+        {
+            perror("Error: Couldn't send file");
+            exit(EXIT_FAILURE);
+        }
+        bzero(data, PACKET_SIZE);
+    }
 }
 
 int main()
@@ -95,14 +101,22 @@ int main()
 
     start_client(client);
 
-    /** Send the first packet train */
-    int send = send_packet(client, "Hello there!");
-    if (send < 0)
+    FILE *file;
+    char *filename = "config.json";
+    file = fopen(filename, "r");
+    if (file == NULL)
     {
-        printf("Error: Counldn't send packet");
+        perror("Error: couldn't read file");
+        exit(EXIT_FAILURE);
     }
 
-    sleep(1);
+    // Send packets with delay
+    for (int i = 0; i < 2; ++i)
+    {
+        send_packet(client, "Hello, there");
+        sleep(1000); // Sleep for specified delay in microseconds
+    }
+
     close(client->sockfd);
     free(client);
 

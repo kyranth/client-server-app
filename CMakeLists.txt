@@ -1,5 +1,0 @@
-cmake_minimum_required(VERSION 3.10)
-project(project)
-
-# Add executable target
-add_executable(${PROJECT_NAME} src/client.c src/server.c)

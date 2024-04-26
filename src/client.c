@@ -32,10 +32,19 @@ typedef struct
     struct sockaddr_in servaddr, cliaddr;
 } Client;
 
+/**
+ * @brief Sets up the client socket connection.
+ * Assigns server address to 0s, then sets ip address family to IPv4.
+ * Follows the similar pattern for client socket connection.
+ *
+ * @param client struct object
+ */
 void start_client(Client *client)
 {
     if (client == NULL)
-        perror("Error initializing Client");
+    {
+        perror("ERROR: Client was not initiated");
+    }
 
     memset(&client->servaddr, 0, sizeof(client->servaddr)); // Set the server address to all 0s
     client->servaddr.sin_family = AF_INET;                  // IPv4 protocol
@@ -96,8 +105,8 @@ void send_file(FILE *file, int sockfd)
 
 int main()
 {
+    /** Instantiate the client */
     Client *client = (Client *)malloc(sizeof(Client));
-    printf("Created Client");
 
     start_client(client);
 
@@ -110,14 +119,20 @@ int main()
         exit(EXIT_FAILURE);
     }
 
-    // Send packets with delay
-    for (int i = 0; i < 2; ++i)
-    {
-        send_packet(client, "Hello, there");
-        sleep(1000); // Sleep for specified delay in microseconds
-    }
+    /** Sending the file */
+    send_file(file, client->sockfd);
 
+    // // Send packets with delay
+    // for (int i = 0; i < 2; ++i)
+    // {
+    //     send_packet(client, "Hello, there");
+    //     sleep(1000); // Sleep for specified delay in microseconds
+    // }
+
+    /** Close the socket connection */
     close(client->sockfd);
+
+    /** Release resources for */
     free(client);
 
     return 0;

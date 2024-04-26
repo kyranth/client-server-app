@@ -65,6 +65,8 @@ void start_server(Server *server)
         perror("ERROR: Bind failed\n");
         exit(EXIT_FAILURE);
     }
+
+    server.cliaddr = accept(sockfd, (struct sockaddr *)&server.cliaddr, &sizeof(server.cliaddr));
 }
 
 /**
@@ -93,6 +95,7 @@ int receive_packet(Server *server)
  * @brief Writes incoming file to given filename from socket connection object.
  *
  * @param sockfd object
+ * @param *file filename
  */
 void write_file(int sockfd, const char *file)
 {
@@ -102,7 +105,7 @@ void write_file(int sockfd, const char *file)
     FILE *fp = fopen(file, "wb");
     if (file == NULL)
     {
-        perror("ERROR: Couldn't open file");
+        perror("ERROR: Couldn't open file\n");
         return;
     }
 
@@ -128,13 +131,19 @@ int main()
     /** Initialize the server */
     start_server(server);
 
+    char file = "config.json";
+    write_file(file, server.cliaddr);
+
     /** Listen for the packets */
-    printf("Listening for packets...");
+    printf("Listening for packets...\n");
     receive_packet(server);
 
     sleep(1);
 
+    /** Close socket connection */
     close(server->sockfd);
+
+    /** Release resources related to the server object */
     free(server);
 
     return 0;

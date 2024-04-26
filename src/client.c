@@ -65,6 +65,8 @@ void start_client(Client *client)
 
     int DF = IP_PMTUDISC_DO; // Don't fragment
     setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &DF, sizeof(DF));
+
+    // Bind the socket connection
     bind(sockfd, (const struct sockaddr *)&client->cliaddr, sizeof(client->cliaddr));
 }
 
@@ -87,6 +89,13 @@ int send_packet(Client *client, char *msg)
     return 0;
 }
 
+/**
+ * @brief Takes a file pointer and socket object
+ * and sends the file over the connection.
+ *
+ * @param *file file pointer
+ * @param sockfd socket object
+ */
 void send_file(FILE *file, int sockfd)
 {
     int n;

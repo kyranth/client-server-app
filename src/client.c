@@ -98,6 +98,12 @@ int send_packet(Client *client, char *msg)
  */
 void send_file(FILE *file, int sockfd)
 {
+    if (file == NULL)
+    {
+        perror("ERROR: File pointer doesn't exist\n");
+        exit(EXIT_FAILURE);
+    }
+
     char data[PACKET_SIZE] = {0};
 
     while (fgets(data, PACKET_SIZE, file) != NULL)
@@ -107,8 +113,10 @@ void send_file(FILE *file, int sockfd)
             perror("Error: Couldn't send file");
             exit(EXIT_FAILURE);
         }
-        bzero(data, PACKET_SIZE);
+        memset(data, 0, PACKET_SIZE);
     }
+
+    fclose(file);
 }
 
 int main()
@@ -119,7 +127,7 @@ int main()
     start_client(client);
 
     FILE *file;
-    char *filename = "config.json";
+    char *filename = "../config.json";
     file = fopen(filename, "r");
     if (file == NULL)
     {

@@ -98,7 +98,6 @@ int send_packet(Client *client, char *msg)
  */
 void send_file(FILE *file, int sockfd)
 {
-    int n;
     char data[PACKET_SIZE] = {0};
 
     while (fgets(data, PACKET_SIZE, file) != NULL)

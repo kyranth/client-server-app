@@ -48,9 +48,9 @@ void start_server(Server *server)
     }
 
     /** Configure Server struct sockaddr_in */
-    server->servaddr.sin_family = AF_INET;                // IPv4
-    server->servaddr.sin_port = SERVER_PORT;              // Server port
-    server->servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // Set to default interface
+    server->servaddr.sin_family = AF_INET;                   // IPv4
+    server->servaddr.sin_port = SERVER_PORT;                 // Server port
+    server->servaddr.sin_addr.s_addr = inet_addr(SERVER_IP); // Set to default interface
     server->clilen = sizeof(server->cliaddr);
 
     /** Create UDP socket */
@@ -80,13 +80,11 @@ void start_server(Server *server)
 int receive_packet(Server *server)
 {
     printf("Listening for pakcets...\n");
-    while (1)
-    {
-        socklen_t len = sizeof(server->cliaddr);
-        ssize_t n = recvfrom(server->sockfd, (char *)server->buffer, PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, &len);
-        server->buffer[n] = '\0';
-        printf("Client: %s\n", server->buffer);
-    }
+
+    socklen_t len = sizeof(server->cliaddr);
+    ssize_t n = recvfrom(server->sockfd, (char *)server->buffer, PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, &len);
+    server->buffer[n] = '\0';
+    printf("Client: %s\n", server->buffer);
 
     // send the response
     sendto(server->sockfd, "msg recieved", PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, sizeof(server->cliaddr));

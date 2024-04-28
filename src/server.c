@@ -44,16 +44,17 @@ void start_server(Server *server)
     if (server == NULL)
     {
         perror("ERROR: initializing Server\n");
+        exit(EXIT_FAILURE);
     }
 
     /** Configure Server struct sockaddr_in */
     server->servaddr.sin_family = AF_INET;                // IPv4
-    server->servaddr.sin_port = htons(SERVER_PORT);       // Server port
+    server->servaddr.sin_port = SERVER_PORT;              // Server port
     server->servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // Set to default interface
     server->clilen = sizeof(server->cliaddr);
 
     /** Create UDP socket */
-    server->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    server->sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (server->sockfd < 0)
     {
         perror("ERROR: opening socket\n");

@@ -46,17 +46,18 @@ void start_client(Client *client)
         perror("ERROR: Client was not initiated\n");
     }
 
+    /** Configure Client struct sockaddr_in */
     memset(&client->servaddr, 0, sizeof(client->servaddr)); // Set the server address to all 0s
     client->servaddr.sin_family = AF_INET;                  // IPv4 protocol
-    client->servaddr.sin_port = htons(SERVER_PORT);         // Setting server port
+    client->servaddr.sin_port = SERVER_PORT;                // Setting server port
     client->servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
 
-    memset(&client->cliaddr, 0, sizeof(client->cliaddr));
-    client->cliaddr.sin_family = AF_INET;
-    client->cliaddr.sin_port = htons(CLIENT_PORT);
-    client->cliaddr.sin_addr.s_addr = inet_addr(CLIENT_IP);
+    // memset(&client->cliaddr, 0, sizeof(client->cliaddr));
+    // client->cliaddr.sin_family = AF_INET;
+    // client->cliaddr.sin_port = htons(CLIENT_PORT);
+    // client->cliaddr.sin_addr.s_addr = inet_addr(CLIENT_IP);
 
-    int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0)
     {
         perror("ERROR: Creating socket\n");
@@ -66,8 +67,13 @@ void start_client(Client *client)
     int DF = IP_PMTUDISC_DO; // Don't fragment
     setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &DF, sizeof(DF));
 
-    // Bind the socket connection
-    bind(sockfd, (const struct sockaddr *)&client->cliaddr, sizeof(client->cliaddr));
+    // Connect to server
+    if (connect(client->sockfd, (struct sockaddr *)&client->servaddr, sizeof(client->servaddr)) < 0)
+    {
+        perror("ERROR: connection failed\n");
+        exit(EXIT_FAILURE);
+    }
+    printf("Connection successfull!\n");
 }
 
 /**

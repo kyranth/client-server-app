@@ -1,8 +1,10 @@
+# Project Files
 *.vscode
-
 *bin
+*client
+*server
 
-# Packaged Files #
+# Packaged Files
 *.jar
 *.war
 *.nar

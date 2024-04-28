@@ -7,7 +7,7 @@
 #include <arpa/inet.h>
 
 /** Constant members */
-#define SERVER_IP "127.0.0.1" // Update for server address
+#define SERVER_IP "172.16.4.4" // Update for server address
 #define SERVER_PORT 8765
 #define CLIENT_PORT 9876
 #define PACKET_SIZE 1024
@@ -97,48 +97,49 @@ int receive_packet(Server *server)
  * @param sockfd object
  * @param *file filename
  */
-void write_file(int sockfd, const char *file)
+void write_file(const char *file, int sockfd)
 {
-    int n;
-    char buffer[PACKET_SIZE];
-
     FILE *fp = fopen(file, "wb");
     if (file == NULL)
     {
-        perror("ERROR: Couldn't open file\n");
-        return;
+        perror("ERROR: Couldn't write file\n");
+        exit(EXIT_FAILURE);
     }
 
-    while (1)
+    // Buffer variable to hold data
+    char buffer[PACKET_SIZE];
+    ssize_t recieved; // updates bytes recieved
+    while (recieved = recv(sockfd, buffer, PACKET_SIZE, 0) > 0)
     {
-        n = recv(sockfd, buffer, PACKET_SIZE, 0);
-        if (n <= 0)
-        {
-            break;
-            return;
-        }
-        fprintf(fp, "%s", buffer);
-        bzero(buffer, PACKET_SIZE);
+        fwrite(buffer, 1, recieved, fp);
     }
-    return;
+
+    if (recieved < 0)
+    {
+        perror("ERROR: reciving data from socket\n");
+    }
+
+    fclose(fp);
+    printf("Successfull!\n");
 }
 
 int main()
 {
     Server *server = (Server *)malloc(sizeof(Server));
-    printf("Created Server");
+    printf("Created Server\n");
 
     /** Initialize the server */
     start_server(server);
 
-    char file = "config.json";
-    write_file(file, server.cliaddr);
+    char *file = "config.json";
+    write_file(file, server->sockfd);
 
     /** Listen for the packets */
-    printf("Listening for packets...\n");
-    receive_packet(server);
+    // printf("Listening for packets...\n");
 
-    sleep(1);
+    // receive_packet(server);
+
+    sleep(5);
 
     /** Close socket connection */
     close(server->sockfd);

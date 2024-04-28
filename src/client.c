@@ -10,8 +10,8 @@
 #include <netinet/udp.h> // For UDP header
 
 /** Constant members */
-#define SERVER_IP "127.0.0.1" // Update for server address
-#define CLIENT_IP "127.0.0.2" // Update for client address
+#define SERVER_IP "172.16.4.4" // Update for server address
+#define CLIENT_IP "172.16.4.2" // Update for client address
 #define SERVER_PORT 8765
 #define CLIENT_PORT 9876
 #define PACKET_SIZE 1024
@@ -43,7 +43,7 @@ void start_client(Client *client)
 {
     if (client == NULL)
     {
-        perror("ERROR: Client was not initiated");
+        perror("ERROR: Client was not initiated\n");
     }
 
     memset(&client->servaddr, 0, sizeof(client->servaddr)); // Set the server address to all 0s
@@ -59,7 +59,7 @@ void start_client(Client *client)
     int sockfd = socket(AF_INET, SOCK_DGRAM, 0);
     if (sockfd < 0)
     {
-        perror("Error opening socket");
+        perror("ERROR: Creating socket\n");
         exit(EXIT_FAILURE);
     }
 
@@ -90,53 +90,45 @@ int send_packet(Client *client, char *msg)
 }
 
 /**
- * @brief Takes a file pointer and socket object
- * and sends the file over the connection.
+ * @brief Takes a filename pointer and socket object
+ * and sends the file over the socket connection.
  *
  * @param *file file pointer
  * @param sockfd socket object
  */
-void send_file(FILE *file, int sockfd)
+void send_file(const char *file, int sockfd)
 {
-    if (file == NULL)
+    FILE *fp = fopen(file, "r");
+    if (fp == NULL)
     {
-        perror("ERROR: File pointer doesn't exist\n");
+        perror("ERROR: File doesn't exist\n");
         exit(EXIT_FAILURE);
     }
 
     char data[PACKET_SIZE] = {0};
 
-    while (fgets(data, PACKET_SIZE, file) != NULL)
+    while (fgets(data, PACKET_SIZE, fp) != NULL)
     {
         if (send(sockfd, data, sizeof(data), 0) == -1)
         {
-            perror("Error: Couldn't send file");
+            perror("ERROR: Couldn't send file");
             exit(EXIT_FAILURE);
         }
         memset(data, 0, PACKET_SIZE);
     }
 
-    fclose(file);
+    fclose(fp);
 }
 
 int main()
 {
     /** Instantiate the client */
     Client *client = (Client *)malloc(sizeof(Client));
-
     start_client(client);
 
-    FILE *file;
-    char *filename = "../config.json";
-    file = fopen(filename, "r");
-    if (file == NULL)
-    {
-        perror("Error: couldn't read file");
-        exit(EXIT_FAILURE);
-    }
-
     /** Sending the file */
-    send_file(file, client->sockfd);
+    char *filename = "../config.json";
+    send_file(filename, client->sockfd);
 
     // // Send packets with delay
     // for (int i = 0; i < 2; ++i)

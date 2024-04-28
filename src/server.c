@@ -79,9 +79,9 @@ void start_server(Server *server)
  */
 int receive_packet(Server *server)
 {
+    printf("Listening for pakcets...\n");
     while (1)
     {
-        printf("Listening for pakcets...\n");
         socklen_t len = sizeof(server->cliaddr);
         ssize_t n = recvfrom(server->sockfd, (char *)server->buffer, PACKET_SIZE, 0, (struct sockaddr *)&server->cliaddr, &len);
         server->buffer[n] = '\0';

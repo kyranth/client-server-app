@@ -57,15 +57,15 @@ void start_client(Client *client)
     // client->cliaddr.sin_port = htons(CLIENT_PORT);
     // client->cliaddr.sin_addr.s_addr = inet_addr(CLIENT_IP);
 
-    int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0)
+    client->sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (client->sockfd < 0)
     {
         perror("ERROR: Creating socket\n");
         exit(EXIT_FAILURE);
     }
 
     int DF = IP_PMTUDISC_DO; // Don't fragment
-    setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &DF, sizeof(DF));
+    setsockopt(client->sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &DF, sizeof(DF));
 
     // Connect to server
     if (connect(client->sockfd, (struct sockaddr *)&client->servaddr, sizeof(client->servaddr)) < 0)

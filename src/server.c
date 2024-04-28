@@ -19,7 +19,7 @@
 typedef struct
 {
     /** Socket object */
-    int sockfd;
+    int sockfd, sockfd_b;
 
     /** IPv4 socket address */
     struct sockaddr_in servaddr, cliaddr;
@@ -50,6 +50,7 @@ void start_server(Server *server)
     server->servaddr.sin_family = AF_INET;                // IPv4
     server->servaddr.sin_port = htons(SERVER_PORT);       // Server port
     server->servaddr.sin_addr.s_addr = htonl(INADDR_ANY); // Set to default interface
+    server->clilen = sizeof(server->cliaddr);
 
     /** Create UDP socket */
     server->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
@@ -66,7 +67,7 @@ void start_server(Server *server)
         exit(EXIT_FAILURE);
     }
 
-    server.cliaddr = accept(sockfd, (struct sockaddr *)&server.cliaddr, &sizeof(server.cliaddr));
+    server->sockfd_b = accept(server->sockfd, (struct sockaddr *)&server->cliaddr, &server->clilen);
 }
 
 /**
@@ -109,7 +110,7 @@ void write_file(const char *file, int sockfd)
     // Buffer variable to hold data
     char buffer[PACKET_SIZE];
     ssize_t recieved; // updates bytes recieved
-    while (recieved = recv(sockfd, buffer, PACKET_SIZE, 0) > 0)
+    while ((recieved = recv(sockfd, buffer, PACKET_SIZE, 0)) > 0)
     {
         fwrite(buffer, 1, recieved, fp);
     }

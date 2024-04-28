@@ -132,13 +132,13 @@ int main()
     /** Initialize the server */
     start_server(server);
 
-    char *file = "config.json";
-    write_file(file, server->sockfd);
+    // char *file = "config.json";
+    // write_file(file, server->sockfd);
 
     /** Listen for the packets */
-    // printf("Listening for packets...\n");
+    printf("Listening for packets...\n");
 
-    // receive_packet(server);
+    receive_packet(server);
 
     sleep(5);
 

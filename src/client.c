@@ -127,15 +127,16 @@ int main()
     start_client(client);
 
     /** Sending the file */
-    char *filename = "../config.json";
-    send_file(filename, client->sockfd);
+    // char *filename = "../config.json";
+    // send_file(filename, client->sockfd);
 
-    // // Send packets with delay
-    // for (int i = 0; i < 2; ++i)
-    // {
-    //     send_packet(client, "Hello, there");
-    //     sleep(1000); // Sleep for specified delay in microseconds
-    // }
+    // Send packets with delay
+    for (int i = 0; i < 2; ++i)
+    {
+        send_packet(client, "Hello, there");
+        sleep(3); // Sleep for specified delay in microseconds
+        printf("Packet sent!\n");
+    }
 
     /** Close the socket connection */
     close(client->sockfd);

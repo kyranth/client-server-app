@@ -48,9 +48,9 @@ void start_server(Server *server)
     }
 
     /** Configure Server struct sockaddr_in */
-    server->servaddr.sin_family = AF_INET;                   // IPv4
-    server->servaddr.sin_port = SERVER_PORT;                 // Server port
-    server->servaddr.sin_addr.s_addr = inet_addr(SERVER_IP); // Set to default interface
+    server->servaddr.sin_family = AF_INET;                    // IPv4
+    server->servaddr.sin_port = SERVER_PORT;                  // Server port
+    server->servaddr.sin_addr.s_addr = inet_addr(INADDR_ANY); // Set to default interface
     server->clilen = sizeof(server->cliaddr);
 
     /** Create UDP socket */

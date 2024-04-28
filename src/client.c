@@ -2,153 +2,115 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <sys/socket.h>
 #include <arpa/inet.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
-#include <netinet/ip.h>  // For IP_HDRINCL
-#include <netinet/udp.h> // For UDP header
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <time.h>
 
-/** Constant members */
-#define SERVER_IP "172.16.4.4" // Update for server address
-#define CLIENT_IP "172.16.4.2" // Update for client address
-#define SERVER_PORT 8765
-#define CLIENT_PORT 9876
+#define SERVER_IP "172.16.4.4"
+#define SERVER_PORT 8080
+#define SIZE 1024
 #define PACKET_SIZE 1024
+#define INTER_MEASUREMENT_TIME 1
+#define THRESHOLD 100
 
-/**
- * @brief Represents the client side of the network compression detection application
- *
- */
-typedef struct
+void p_error(const char *msg)
 {
-    /** Socket object */
-    int sockfd;
-
-    /** Variable hold message */
-    char msg_buffer[PACKET_SIZE];
-
-    /** IPv4 socker server address */
-    struct sockaddr_in servaddr, cliaddr;
-} Client;
-
-/**
- * @brief Sets up the client socket connection.
- * Assigns server address to 0s, then sets ip address family to IPv4.
- * Follows the similar pattern for client socket connection.
- *
- * @param client struct object
- */
-void start_client(Client *client)
-{
-    if (client == NULL)
-    {
-        perror("ERROR: Client was not initiated\n");
-    }
-
-    /** Configure Client struct sockaddr_in */
-    memset(&client->servaddr, 0, sizeof(client->servaddr)); // Set the server address to all 0s
-    client->servaddr.sin_family = AF_INET;                  // IPv4 protocol
-    client->servaddr.sin_port = SERVER_PORT;                // Setting server port
-    client->servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
-
-    // memset(&client->cliaddr, 0, sizeof(client->cliaddr));
-    // client->cliaddr.sin_family = AF_INET;
-    // client->cliaddr.sin_port = htons(CLIENT_PORT);
-    // client->cliaddr.sin_addr.s_addr = inet_addr(CLIENT_IP);
-
-    client->sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (client->sockfd < 0)
-    {
-        perror("ERROR: Creating socket\n");
-        exit(EXIT_FAILURE);
-    }
-
-    int DF = IP_PMTUDISC_DO; // Don't fragment
-    setsockopt(client->sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &DF, sizeof(DF));
-
-    // Connect to server
-    if (connect(client->sockfd, (struct sockaddr *)&client->servaddr, sizeof(client->servaddr)) < 0)
-    {
-        perror("ERROR: connection failed\n");
-        exit(EXIT_FAILURE);
-    }
-    printf("Connection successfull!\n");
+    perror(msg);
+    exit(EXIT_FAILURE);
 }
 
-/**
- * @brief Sends a packet train, with the message
- *
- * @param client this client object
- * @param msg message
- * @return int 0 if recieved successful, -1 otherwise
- */
-int send_packet(Client *client, char *msg)
+void send_config(int sockfd)
 {
-    // Send meessage
-    sendto(client->sockfd, msg, PACKET_SIZE, 0, (const struct sockaddr *)&client->servaddr, sizeof(client->servaddr));
-
-    // waiting for response
-    recvfrom(client->sockfd, client->msg_buffer, sizeof(client->msg_buffer), 0, (struct sockaddr *)NULL, NULL);
-
-    puts(client->msg_buffer);
-    return 0;
+    FILE *config_file;
+    char buffer[SIZE];
+    config_file = fopen("config.json", "r");
+    if (config_file == NULL)
+    {
+        p_error("Error opening config file.");
+    }
+    while (fgets(buffer, SIZE, config_file) != NULL)
+    {
+        send(sockfd, buffer, strlen(buffer), 0);
+    }
+    fclose(config_file);
 }
 
-/**
- * @brief Takes a filename pointer and socket object
- * and sends the file over the socket connection.
- *
- * @param *file file pointer
- * @param sockfd socket object
- */
-void send_file(const char *file, int sockfd)
+void send_packet_train(int sockfd, struct sockaddr_in servaddr, int n, int entropy)
 {
-    FILE *fp = fopen(file, "r");
-    if (fp == NULL)
+    char packet[PACKET_SIZE];
+    // struct timeval start_time, end_time;
+    // gettimeofday(&start_time, NULL);
+    for (int i = 0; i < n; ++i)
     {
-        perror("ERROR: File doesn't exist\n");
-        exit(EXIT_FAILURE);
+        memset(packet, 0, PACKET_SIZE);
+        *(uint16_t *)packet = htons(i); // Packet ID
+        sendto(sockfd, packet, PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
     }
-
-    char data[PACKET_SIZE] = {0};
-
-    while (fgets(data, PACKET_SIZE, fp) != NULL)
-    {
-        if (send(sockfd, data, sizeof(data), 0) == -1)
-        {
-            perror("ERROR: Couldn't send file");
-            exit(EXIT_FAILURE);
-        }
-        memset(data, 0, PACKET_SIZE);
-    }
-
-    fclose(fp);
+    // gettimeofday(&end_time, NULL);
+    if (entropy)
+        sleep(INTER_MEASUREMENT_TIME); // Wait before sending high entropy data
 }
 
 int main()
 {
-    /** Instantiate the client */
-    Client *client = (Client *)malloc(sizeof(Client));
-    start_client(client);
+    int sockfd;
+    struct sockaddr_in servaddr;
+    // struct timeval start_time_low, end_time_low, start_time_high, end_time_high;
+    // double low_entropy_time, high_entropy_time;
 
-    /** Sending the file */
-    // char *filename = "../config.json";
-    // send_file(filename, client->sockfd);
-
-    // Send packets with delay
-    for (int i = 0; i < 2; ++i)
+    // Create TCP socket
+    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        send_packet(client, "Hello, there");
-        sleep(3); // Sleep for specified delay in microseconds
-        printf("Packet sent!\n");
+        p_error("Socket creation failed");
     }
 
-    /** Close the socket connection */
-    close(client->sockfd);
+    // Set server address
+    memset(&servaddr, 0, sizeof(servaddr));
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(SERVER_IP);
+    servaddr.sin_port = htons(SERVER_PORT);
 
-    /** Release resources for */
-    free(client);
+    // Connect to server
+    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    {
+        p_error("Connection Failed");
+    }
+
+    // Pre-Probing Phase: Send config file
+    send_config(sockfd);
+
+    // Probing Phase: Send packet trains
+    // gettimeofday(&start_time_low, NULL);
+    // send_packet_train(sockfd, servaddr, 10, 0); // Low entropy data
+    // gettimeofday(&end_time_low, NULL);
+    // gettimeofday(&start_time_high, NULL);
+    // send_packet_train(sockfd, servaddr, 10, 1); // High entropy data
+    // gettimeofday(&end_time_high, NULL);
+
+    // Post-Probing Phase: Receive findings from server
+    // char buffer[SIZE];
+    // read(sockfd, buffer, SIZE);
+    // printf("Server findings: %s\n", buffer);
+
+    // Close TCP connection
+    close(sockfd);
+
+    // Calculate time differences
+    // low_entropy_time = (end_time_low.tv_sec - start_time_low.tv_sec) * 1000.0 + (end_time_low.tv_usec - start_time_low.tv_usec) / 1000.0;
+    // high_entropy_time = (end_time_high.tv_sec - start_time_high.tv_sec) * 1000.0 + (end_time_high.tv_usec - start_time_high.tv_usec) / 1000.0;
+
+    // Check for compression
+    // if ((high_entropy_time - low_entropy_time) > THRESHOLD)
+    // {
+    //     printf("Compression detected!\n");
+    // }
+    // else
+    // {
+    //     printf("No compression was detected.\n");
+    // }
 
     return 0;
 }

@@ -22,3 +22,6 @@ server: $(src)/server.c
 
 clean:
 	rm -f *.o *.so client server
+
+run:
+	./client config.json

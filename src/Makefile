@@ -15,4 +15,4 @@ server: server.c
 	$(CC) $(CFLAGS) -o server server.c
 
 clean:
-	rm -f client server
+	rm -f *.o *.so client server

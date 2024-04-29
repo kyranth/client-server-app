@@ -148,18 +148,21 @@ int send_file(int sockfd)
     {
         send(sockfd, buffer, strlen(buffer), 0);
     }
+    memset(buffer, 0, SIZE);
     fclose(config_file);
+    printf("File closed. Waiting for confirmation...\n");
 
     // Receive confirmation message
     ssize_t bytes_received = recv(sockfd, buffer, SIZE, 0);
-    if (bytes_received == -1)
+    if (bytes_received < 0)
     {
         p_error("Receive failed");
         return -1;
     }
     else if (bytes_received == 0)
     {
-        printf("Server closed connection\n"); // TODO close TCP connection
+        printf("Server closed connection\n");
+        close(sockfd);
     }
     else
     {
@@ -167,7 +170,6 @@ int send_file(int sockfd)
         printf("Server: %s\n", buffer);
     }
 
-    close(sockfd);
     return 0;
 }
 

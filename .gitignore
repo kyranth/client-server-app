@@ -3,6 +3,8 @@
 *bin
 *client
 *server
+*.o
+*.so
 
 # Packaged Files
 *.jar

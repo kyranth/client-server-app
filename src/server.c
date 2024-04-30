@@ -9,7 +9,7 @@
 #include <netinet/tcp.h>
 
 #define SERVER_PORT 7777
-#define SIZE 1024
+#define BUFFER_SIZE 1024
 
 void p_error(const char *msg)
 {
@@ -17,31 +17,67 @@ void p_error(const char *msg)
     exit(EXIT_FAILURE);
 }
 
-void init_tcp(int sockfd)
+int init_tcp()
 {
+    int sockfd;
     // Creating TCP socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         p_error("ERROR: TCP Socket creation failed\n");
     }
+    return sockfd;
 }
 
-void init_udp(int sockfd)
+int init_udp()
 {
+    int sockfd;
     // Creating UDP socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
     {
         p_error("ERROR: UDP Socket creation failed\n");
     }
+    return sockfd;
 }
 
-void process_config(int connfd)
+int process_config(int connfd)
 {
-    char buffer[SIZE];
-    while (recv(connfd, buffer, SIZE, 0) > 0)
+    // Receive file size
+    uint64_t file_size;
+    if (recv(connfd, &file_size, BUFFER_SIZE, 0) > 0)
     {
-        printf("Received: %s", buffer);
+        printf("File size: %ld\n", file_size);
     }
+
+    FILE *fp = fopen("rec_config.json", "w");
+
+    // Hold incoming data
+    char buffer[BUFFER_SIZE];
+
+    ssize_t total_bytes_received = 0;
+    ssize_t bytes_received;
+    while (total_bytes_received < file_size)
+    {
+        bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0);
+        if (bytes_received == -1)
+        {
+            perror("Receive failed");
+            exit(EXIT_FAILURE);
+        }
+        else if (bytes_received == 0)
+        {
+            printf("Client closed connection unexpectedly\n");
+            exit(EXIT_FAILURE);
+        }
+        fwrite(buffer, 1, bytes_received, fp);
+        total_bytes_received += bytes_received;
+    }
+
+    // Send confirmation message
+    char confirm[] = "Recieved";
+    send(connfd, confirm, strlen(confirm), 0);
+    close(connfd);
+    fclose(fp);
+    return 0;
 }
 
 int main()
@@ -83,12 +119,10 @@ int main()
     }
 
     /** Pre-Probing Phase: Process config file */
-    process_config(connfd);
-    // Send confirmation message
-    char confirm[] = "Success";
-    if (send(connfd, confirm, strlen(confirm), 0) < 0)
+    int process = process_config(connfd);
+    if (process < 0)
     {
-        p_error("Send failed");
+        p_error("ERROR: Processing config file\n");
     }
 
     /** Probing Phase: Receive packet trains */
@@ -104,7 +138,6 @@ int main()
     // send(connfd, "Compression detected!", strlen("Compression detected!"), 0);
 
     /** Close TCP connection */
-    close(connfd);
     close(sockfd);
 
     return 0;

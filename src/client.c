@@ -11,6 +11,7 @@
 #include <netinet/udp.h>
 #include <time.h>
 
+#define BUFFER_SIZE 1024
 #define THRESHOLD 100
 
 // Structure definition
@@ -135,25 +136,39 @@ void init_udp()
 
 int send_file(int sockfd)
 {
-    int SIZE = 255;
+    /** Create file */
     FILE *config_file;
-    char buffer[SIZE];
+    char buffer[BUFFER_SIZE] = {0};
+
+    /** Open and read file */
     config_file = fopen("config.json", "r");
     if (config_file == NULL)
     {
-        p_error("Error opening config file.");
+        p_error("Error opening config file\n");
     }
 
-    while (fgets(buffer, SIZE, config_file) != NULL)
+    /** Read filesize */
+    fseek(config_file, 0, SEEK_END);
+    uint64_t size = ftell(config_file);
+    printf("File size: %ld\n", size);
+    send(sockfd, &size, sizeof(size), 0);
+
+    // sleep(1);
+
+    while (fgets(buffer, BUFFER_SIZE, config_file) != NULL)
     {
-        send(sockfd, buffer, strlen(buffer), 0);
+        if (send(sockfd, buffer, BUFFER_SIZE, 0) == -1)
+        {
+            p_error("Error sending file\n");
+        }
+        memset(buffer, 0, BUFFER_SIZE);
     }
-    memset(buffer, 0, SIZE);
+
     fclose(config_file);
     printf("File closed. Waiting for confirmation...\n");
 
     // Receive confirmation message
-    ssize_t bytes_received = recv(sockfd, buffer, SIZE, 0);
+    ssize_t bytes_received = recv(sockfd, buffer, BUFFER_SIZE, 0);
     if (bytes_received < 0)
     {
         p_error("Receive failed");

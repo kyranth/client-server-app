@@ -9,7 +9,7 @@ CFLAGS=-g -Wall -std=c99
 lib=lib
 src=src
 
-all: cJSON.o client
+all: cJSON.o client server
 
 cJSON.o: $(lib)/cJSON.c $(lib)/cJSON.h
 	$(CC) $(CFLAGS) -c $(lib)/cJSON.c

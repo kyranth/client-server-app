@@ -8,6 +8,6 @@
     "tcp_post_probing_port": 6666,
     "udp_payload_size": 1000,
     "inter_measurement_time": 15,
-    "udp_packet_train_size": 6000,
+    "num_udp_packets": 6000,
     "udp_packet_ttl": 255
 }

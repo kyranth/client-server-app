@@ -6,16 +6,19 @@ CC=gcc
 #  -Wall turns on most, but not all, compiler warnings
 CFLAGS=-g -Wall -std=c99
 
+TARGET=app
+OBJECTS=cJSON.o
+
 lib=lib
 src=src
 
-all: cJSON.o client server
+$(TARGET): $(OBJECTS) client server
 
 cJSON.o: $(lib)/cJSON.c $(lib)/cJSON.h
 	$(CC) $(CFLAGS) -c $(lib)/cJSON.c
 
 client: $(src)/client.c
-	$(CC) $(CFLAGS) -o client $(src)/client.c cJSON.o
+	$(CC) $(CFLAGS) -o client $(src)/client.c $(OBJECTS)
 
 server: $(src)/server.c
 	$(CC) $(CFLAGS) -o server $(src)/server.c

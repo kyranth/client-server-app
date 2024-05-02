@@ -39,15 +39,22 @@ int init_udp()
     return sockfd;
 }
 
-int process_config(int connfd)
+ssize_t getFileSize(int connfd)
 {
     // Receive file size
     uint64_t file_size;
-    if (recv(connfd, &file_size, BUFFER_SIZE, 0) > 0)
+    if (recv(connfd, &file_size, BUFFER_SIZE, 0) > 0) // FIXME: getting stuck on recv
     {
-        printf("File size: %ld\n", file_size);
+        return file_size;
     }
+    return file_size;
+}
 
+int process_config(int connfd)
+{
+    ssize_t file_size = getFileSize(connfd); // FIXME: Stuck here
+
+    printf("Creating file...");
     FILE *fp = fopen("rec_config.json", "w");
 
     // Hold incoming data
@@ -58,6 +65,7 @@ int process_config(int connfd)
     while (total_bytes_received < file_size)
     {
         bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0);
+        printf("Bytes: %ld", bytes_received);
         if (bytes_received == -1)
         {
             perror("Receive failed");
@@ -85,7 +93,6 @@ int main()
     /** Create sokect connection */
     int sockfd, connfd;
     struct sockaddr_in servaddr, cliaddr;
-    socklen_t len;
 
     /** Create TCP socket */
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
@@ -112,13 +119,13 @@ int main()
     }
 
     /** Accept incoming connection */
-    len = sizeof(cliaddr);
+    socklen_t len = sizeof(cliaddr);
     if ((connfd = accept(sockfd, (struct sockaddr *)&cliaddr, &len)) < 0)
     {
         p_error("Accept failed");
     }
 
-    /** Pre-Probing Phase: Process config file */
+    /** Pre-Probing Phase: Recieve and process config file */
     int process = process_config(connfd);
     if (process < 0)
     {
@@ -127,15 +134,23 @@ int main()
 
     /** Probing Phase: Receive packet trains */
     // (Here you would receive and process the UDP packets)
-    // For the sake of simplicity, let's assume it's done elsewhere
 
-    /** Calculate time differences */
+    /** Post-Probing Phase: Check for compression and Send findings */
     // low_entropy_time = (end_time_low.tv_sec - start_time_low.tv_sec) * 1000.0 + (end_time_low.tv_usec - start_time_low.tv_usec) / 1000.0;
     // high_entropy_time = (end_time_high.tv_sec - start_time_high.tv_sec) * 1000.0 + (end_time_high.tv_usec - start_time_high.tv_usec) / 1000.0;
 
-    /** Post-Probing Phase: Send findings */
-    // detect_compression();
-    // send(connfd, "Compression detected!", strlen("Compression detected!"), 0);
+    char result[25];
+    // if ((high_entropy_time - low_entropy_time) > THRESHOLD) // TODO: check for miliseconds or seconds
+    // {
+    // strcpy(result, "Compression detected!");
+    //     send(connfd, result, strlen(result), 0);
+    // }
+    // else
+    // {
+    // strcpy(result, "No Compression detected!");
+    //     send(connfd, result, strlen(result), 0);
+    // }
+    //
 
     /** Close TCP connection */
     close(sockfd);

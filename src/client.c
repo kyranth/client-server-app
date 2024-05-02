@@ -246,8 +246,6 @@ int main(int argc, char *argv[])
 
     /** Probing Phase: Sending low and high entropy data */
 
-    double low_entropy_time, high_entropy_time; // time variables
-
     // [1] Initiate UDP Connection
     sockfd = init_udp();
     servaddr.sin_port = htons(config->udp_destination_port);

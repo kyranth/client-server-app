@@ -7,6 +7,7 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <sys/time.h>
 
 #define SERVER_PORT 7777
 #define BUFFER_SIZE 1024
@@ -126,16 +127,29 @@ int main()
     }
 
     /** Pre-Probing Phase: Recieve and process config file */
-    int process = process_config(connfd);
+    int process = process_config(connfd); // Close TCP connection if successful
     if (process < 0)
     {
         p_error("ERROR: Processing config file\n");
     }
 
     /** Probing Phase: Receive packet trains */
-    // (Here you would receive and process the UDP packets)
+    struct timeval t1, t2; // time variables
+    char buffer[BUFFER_SIZE];
+    n = recvfrom(sockfd, (char *)buffer, BUFFER_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+    buffer[n] = '\0';
+    gettimeofday(&t1, NULL); // Record arrival time of first packet
+    printf("First packet received: %s\n", buffer);
+
+    // Receiving second UDP packet
+    n = recvfrom(sockfd, (char *)buffer, BUFFER_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+    buffer[n] = '\0';
+    gettimeofday(&t2, NULL); // Record arrival time of second packet
+    printf("Second packet received: %s\n", buffer);
 
     /** Post-Probing Phase: Check for compression and Send findings */
+    double low_entropy_time, high_entropy_time;
+
     // low_entropy_time = (end_time_low.tv_sec - start_time_low.tv_sec) * 1000.0 + (end_time_low.tv_usec - start_time_low.tv_usec) / 1000.0;
     // high_entropy_time = (end_time_high.tv_sec - start_time_high.tv_sec) * 1000.0 + (end_time_high.tv_usec - start_time_high.tv_usec) / 1000.0;
 

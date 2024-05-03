@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include "../lib/cJSON.h"
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -11,6 +12,21 @@
 
 #define SERVER_PORT 7777
 #define BUFFER_SIZE 1024
+
+// Structure definition
+typedef struct
+{
+    char *server_ip_address; // Assuming IPv4 address, so 15 characters + null terminator
+    int tcp_pre_probing_port;
+    int udp_source_port;
+    int udp_destination_port;
+    int tcp_head_syn_port;
+    int tcp_tail_syn_port;
+    int udp_payload_size;
+    int inter_measurement_time;
+    int num_udp_packets;
+    int udp_packet_ttl;
+} Config;
 
 void p_error(const char *msg)
 {
@@ -40,46 +56,95 @@ int init_udp()
     return sockfd;
 }
 
-ssize_t getFileSize(int connfd)
-{
-    // Receive file size
-    uint64_t file_size;
-    if (recv(connfd, &file_size, BUFFER_SIZE, 0) > 0) // FIXME: getting stuck on recv
-    {
-        return file_size;
-    }
-    return file_size;
-}
-
-int process_config(int connfd)
+/**
+ * @brief Takes connfd and receives config file over socket connection.
+ *
+ * @param connfd socket file descriptor
+ * @return 0 if successful or -1 otherwise
+ */
+int getConfigFile(int connfd, const char *config_file)
 {
     FILE *fp;
-    fp = fopen("recv_config.json", "w");
+    fp = fopen(config_file, "w");
 
     // Hold incoming data
     char buffer[BUFFER_SIZE];
     ssize_t bytes_received;
     while ((bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0)) > 0)
     {
-        printf("Bytes: %ld\n", bytes_received);
         if (bytes_received == 0)
         {
             printf("Client closed connection unexpectedly\n");
-            exit(EXIT_FAILURE);
+            return -1;
         }
-        printf("Buffer: %s", buffer);
-        // fwrite(buffer, 1, bytes_received, fp);
+        else if (bytes_received == -1)
+        {
+            printf("ERROR: Couldn't receive file\n");
+            return -1;
+        }
         fprintf(fp, "%s", buffer);
         memset(buffer, 0, BUFFER_SIZE);
     }
+    // Close file
     fclose(fp);
+    // Close connection file descriptor
     close(connfd);
     return 0;
 }
 
+/**
+ * @brief Takes a filename and returns the cJSON object
+ *
+ * @param file pointer to a filename
+ * @param config structure
+ */
+void setConfig(const char *file, Config *config)
+{
+    // open the file
+    FILE *fp = fopen(file, "r");
+    if (fp == NULL)
+    {
+        p_error("Could not open config file\n");
+    }
+
+    // read the file contents into a string
+    char buffer[BUFFER_SIZE];
+    fread(buffer, 1, sizeof(buffer), fp);
+    fclose(fp);
+
+    // parse the JSON data
+    cJSON *json = cJSON_Parse(buffer);
+    if (json == NULL)
+    {
+        const char *error_ptr = cJSON_GetErrorPtr();
+        if (error_ptr != NULL)
+        {
+            printf("Error: %s\n", error_ptr);
+        }
+        p_error("Could not parse config file\n");
+    }
+    else
+    {
+        strcpy(config->server_ip_address,
+               cJSON_GetObjectItemCaseSensitive(json, "server_ip_address")->valuestring);
+        config->tcp_pre_probing_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_pre_probing_port")->valueint;
+        config->udp_source_port = cJSON_GetObjectItemCaseSensitive(json, "udp_source_port")->valueint;
+        config->udp_destination_port = cJSON_GetObjectItemCaseSensitive(json, "udp_destination_port")->valueint;
+        config->tcp_head_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_head_syn_port")->valueint;
+        config->tcp_tail_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_tail_syn_port")->valueint;
+        config->udp_payload_size = cJSON_GetObjectItemCaseSensitive(json, "udp_payload_size")->valueint;
+        config->inter_measurement_time = cJSON_GetObjectItemCaseSensitive(json, "inter_measurement_time")->valueint;
+        config->num_udp_packets = cJSON_GetObjectItemCaseSensitive(json, "num_udp_packets")->valueint;
+        config->udp_packet_ttl = cJSON_GetObjectItemCaseSensitive(json, "udp_packet_ttl")->valueint;
+    }
+
+    // delete the JSON object
+    cJSON_Delete(json);
+}
+
 int main()
 {
-    /** Create sokect connection */
+    /** Create socket connection */
     int sockfd, connfd;
     struct sockaddr_in servaddr, cliaddr;
 
@@ -114,15 +179,15 @@ int main()
         p_error("Accept failed");
     }
 
-    /** Pre-Probing Phase: Recieve and process config file */
-    // char *config;
-    // config = (char *)malloc(sizeof(char) * 512);
-    int process = process_config(connfd); // Close TCP connection if successful
+    /** Pre-Probing Phase: Receive and process config file */
+    char *config_file[] = "recv_config.json";
+    int process = getConfigFile(connfd, config_file); // Close TCP connection if successful
     if (process < 0)
     {
-        p_error("ERROR: Processing config file\n");
+        p_error("ERROR: Didn't receive config file\n");
     }
-    // printf("Config: %s\n", config);
+    Config *config;
+    setConfig(config_file, config);
 
     /** Probing Phase: Receive packet trains */
     // struct timeval t1, t2; // time variables

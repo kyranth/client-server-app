@@ -62,7 +62,7 @@ void p_error(const char *msg)
 }
 
 /**
- * @brief Takes a filename and returns the cJSON obejct
+ * @brief Takes a filename and returns the cJSON object
  *
  * @param file pointer to a filename
  * @param config structure
@@ -111,30 +111,46 @@ void setConfig(const char *file, Config *config)
     cJSON_Delete(json);
 }
 
+/**
+ * Creates a TCP file descriptor and returns for use.
+ *
+ * @return sockfd file descriptor
+ */
 int init_tcp()
 {
     int sockfd;
     // Creating TCP socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
-        p_error("ERROR: TCP Socket creation failed\n");
+        printf("ERROR: TCP Socket creation failed\n");
+        return -1;
     }
     return sockfd;
 }
 
+/**
+ * Creates a UDP file descriptor and returns for use.
+ *
+ * @return sockfd file descriptor or -1 if unsuccessful
+ */
 int init_udp()
 {
     int sockfd;
-
     // Creating UDP socket file descriptor
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0)
     {
-        p_error("ERROR: UDP Socket creation failed\n");
+        printf("ERROR: UDP Socket creation failed\n");
+        return -1;
     }
     return sockfd;
 }
 
-int send_file(int sockfd)
+/**
+ * @brief Takes sockfd and sends config file over connection
+ *
+ * @param sockfd socket file descriptor or -1 if unsuccessful
+ */
+int send_ConfigFile(int sockfd)
 {
     /** Create file */
     FILE *config_file;
@@ -143,47 +159,24 @@ int send_file(int sockfd)
     config_file = fopen("config.json", "r");
     if (config_file == NULL)
     {
-        p_error("ERROR opening config file\n");
+        printf("ERROR: Opening config file\n");
+        return -1;
     }
-
-    /** Read filesize */
-    // fseek(config_file, 0, SEEK_END);
-    // uint64_t size = ftell(config_file);
-    // printf("File size: %ld\n", size);
-
-    // Send file size
-    // send(sockfd, &size, sizeof(size), 0); // TODO: stuck on recv line 46 Server
 
     ssize_t bytes = 0;
     char buffer[BUFFER_SIZE] = {0};
     while (fgets(buffer, BUFFER_SIZE, config_file) != NULL)
     {
         bytes = send(sockfd, buffer, BUFFER_SIZE, 0);
-        printf("buffer: %s", buffer);
-        memset(buffer, 0, BUFFER_SIZE);
+        if (bytes < 0)
+        {
+            printf("ERROR: Couldn't send file\n");
+            return -1;
+        }
+        memset(buffer, 0, BUFFER_SIZE); // reset buffer
     }
-
+    // Close file
     fclose(config_file);
-
-    // printf("File closed. Waiting for confirmation...\n");
-    // // Receive confirmation message
-    // ssize_t bytes_received = recv(sockfd, buffer, BUFFER_SIZE, 0);
-    // if (bytes_received < 0)
-    // {
-    //     p_error("Receive failed");
-    //     return -1;
-    // }
-    // else if (bytes_received == 0)
-    // {
-    //     printf("Server closed connection\n");
-    //     close(sockfd);
-    // }
-    // else
-    // {
-    //     buffer[bytes_received] = '\0';
-    //     printf("Server: %s\n", buffer);
-    // }
-
     return 0;
 }
 
@@ -207,23 +200,22 @@ void send_packet_train(int sockfd, struct sockaddr_in servaddr, int entropy)
 
 int main(int argc, char *argv[])
 {
-    /** Check for commandline arguments */
+    /** Check for command line arguments */
     if (argc < 1)
     {
-        printf("Error: Expected (1) arguement config.json file\n");
+        printf("Error: Expected (1) argument config.json file\n");
         exit(0);
     }
-    char *config_file = argv[1]; // Get config file from commandline
+    char *config_file = argv[1]; // Get config file from command line
 
-    struct sockaddr_in servaddr; // Create sokcet file descriptors
+    struct sockaddr_in servaddr; // Create socket file descriptors
 
     /** Initialize a config structure to NULL values */
     Config *config = createConfig();
 
     /** Read the config file for server IP and fill it with JSON data */
     setConfig(config_file, config);
-    printf("Server IP: %s\n", config->server_ip_address);
-    printf("Pre prob port: %d\n", config->tcp_pre_probing_port);
+    printf("Server IP/Port: %s/%d\n", config->server_ip_address, config->tcp_pre_probing_port);
 
     /** Init TCP Connection */
     int sockfd = init_tcp();
@@ -241,8 +233,12 @@ int main(int argc, char *argv[])
     }
 
     /** Pre-Probing Phase: Send config file */
-    send_file(sockfd);
-    close(sockfd);
+    int send = send_ConfigFile(sockfd);
+    if (send < 0)
+    {
+        p_error("Couldn't send config file\n");
+    }
+    close(sockfd); // TCP Connection
 
     /** Probing Phase: Sending low and high entropy data */
     // [1] Initiate UDP Connection
@@ -279,6 +275,6 @@ int main(int argc, char *argv[])
     /** Post Probing Phase: Calculate compression; done on Server */
     // close(sockfd);
 
-    free(config);
+    free(config); // Release config
     return 0;
 }

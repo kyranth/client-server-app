@@ -16,7 +16,7 @@
 // Structure definition
 typedef struct
 {
-    char *server_ip_address; // Assuming IPv4 address, so 15 characters + null terminator
+    char *server_ip_address;
     int tcp_pre_probing_port;
     int udp_source_port;
     int udp_destination_port;
@@ -66,8 +66,7 @@ Config *createConfig()
     }
 
     // Allocate memory for server_ip_address
-    config->server_ip_address = malloc(16 * sizeof(char)); // Assuming IPv4 address, so 15 characters + null terminator
-    // config->tcp_pre_probing_port = malloc(8 * sizeof(char));
+    config->server_ip_address = malloc(16 * sizeof(char));
 
     if (config->server_ip_address == NULL)
     {

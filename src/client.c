@@ -10,6 +10,7 @@
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
 #include <sys/time.h>
+#include <time.h>
 
 #define BUFFER_SIZE 1024
 #define THRESHOLD 100
@@ -137,29 +138,27 @@ int send_file(int sockfd)
 {
     /** Create file */
     FILE *config_file;
-    char buffer[BUFFER_SIZE] = {0};
 
     /** Open and read file */
     config_file = fopen("config.json", "r");
     if (config_file == NULL)
     {
-        p_error("Error opening config file\n");
+        p_error("ERROR opening config file\n");
     }
 
     /** Read filesize */
-    fseek(config_file, 0, SEEK_END);
-    uint64_t size = ftell(config_file);
-    printf("File size: %ld\n", size);
+    // fseek(config_file, 0, SEEK_END);
+    // uint64_t size = ftell(config_file);
+    // printf("File size: %ld\n", size);
 
     // Send file size
-    send(sockfd, &size, sizeof(size), 0); // TODO: stuck on recv line 46 Server
+    // send(sockfd, &size, sizeof(size), 0); // TODO: stuck on recv line 46 Server
 
-    while (fgets(buffer, BUFFER_SIZE, config_file) != NULL)
+    ssize_t bytes = 0;
+    char buffer[BUFFER_SIZE] = {0};
+    while (fgets(buffer, BUFFER_SIZE, config_file) != NULL || bytes != -1)
     {
-        if (send(sockfd, buffer, BUFFER_SIZE, 0) == -1)
-        {
-            p_error("Error sending file\n");
-        }
+        bytes = send(sockfd, buffer, BUFFER_SIZE, 0);
         memset(buffer, 0, BUFFER_SIZE);
     }
 
@@ -241,39 +240,38 @@ int main(int argc, char *argv[])
     }
 
     /** Pre-Probing Phase: Send config file */
-    // send_file(sockfd);
+    send_file(sockfd);
     close(sockfd);
 
     /** Probing Phase: Sending low and high entropy data */
-
     // [1] Initiate UDP Connection
-    sockfd = init_udp();
-    servaddr.sin_port = htons(config->udp_destination_port);
+    // sockfd = init_udp();
+    // servaddr.sin_port = htons(config->udp_destination_port);
 
     // [2] connect to server
-    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
-    {
-        p_error("UDP Connection Failed\n");
-    }
+    // if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    // {
+    //     p_error("UDP Connection Failed\n");
+    // }
 
     // [3] Generate low entropy data (all 0s)
-    char low_entropy_data[PACKET_SIZE];
-    memset(low_entropy_data, 0, sizeof(low_entropy_data));
+    // char low_entropy_data[PACKET_SIZE];
+    // memset(low_entropy_data, 0, sizeof(low_entropy_data));
 
     // [4] Generate high entropy data (random numbers)
-    srand(time(NULL));
-    char high_entropy_data[PACKET_SIZE - sizeof(uint16_t)];
-    for (int i = 0; i < sizeof(high_entropy_data); ++i)
-    {
-        high_entropy_data[i] = rand() % 256;
-    }
+    // srand(time(NULL));
+    // char high_entropy_data[PACKET_SIZE - sizeof(uint16_t)];
+    // for (int i = 0; i < sizeof(high_entropy_data); ++i)
+    // {
+    //     high_entropy_data[i] = rand() % 256;
+    // }
 
     // [5] Construct and send packet train
 
     // [6] Send low entropy data packet
 
     // [7] Wait before sending high entropy data
-    sleep(INTER_MEASUREMENT_TIME);
+    // sleep(INTER_MEASUREMENT_TIME);
 
     // [8] Send high entropy data packet
 

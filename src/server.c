@@ -51,26 +51,28 @@ ssize_t getFileSize(int connfd)
     return file_size;
 }
 
-int process_config(int connfd, char *config)
+int process_config(int connfd)
 {
-    // ssize_t file_size = getFileSize(connfd); // FIXME: Stuck here
+    FILE *fp;
+    fp = fopen("recv_config.json", "w");
 
     // Hold incoming data
     char buffer[BUFFER_SIZE];
-    // char *config; // recive config here
-    // config = (char *)malloc(sizeof(char) * 512);
     ssize_t bytes_received;
     while ((bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0)) > 0)
     {
-        printf("Bytes: %ld", bytes_received);
+        printf("Bytes: %ld\n", bytes_received);
         if (bytes_received == 0)
         {
             printf("Client closed connection unexpectedly\n");
             exit(EXIT_FAILURE);
         }
-        strcat(config, buffer);
+        printf("Buffer: %s", buffer);
+        // fwrite(buffer, 1, bytes_received, fp);
+        fprintf(fp, "%s", buffer);
+        memset(buffer, 0, BUFFER_SIZE);
     }
-    printf("Buffer: %s\n", buffer);
+    fclose(fp);
     close(connfd);
     return 0;
 }
@@ -113,14 +115,14 @@ int main()
     }
 
     /** Pre-Probing Phase: Recieve and process config file */
-    char *config;
-    config = (char *)malloc(sizeof(char) * 512);
-    int process = process_config(connfd, config); // Close TCP connection if successful
+    // char *config;
+    // config = (char *)malloc(sizeof(char) * 512);
+    int process = process_config(connfd); // Close TCP connection if successful
     if (process < 0)
     {
         p_error("ERROR: Processing config file\n");
     }
-    printf("Config: %s\n", config);
+    // printf("Config: %s\n", config);
 
     /** Probing Phase: Receive packet trains */
     // struct timeval t1, t2; // time variables

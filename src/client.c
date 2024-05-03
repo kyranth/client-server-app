@@ -164,25 +164,25 @@ int send_file(int sockfd)
     }
 
     fclose(config_file);
-    printf("File closed. Waiting for confirmation...\n");
 
-    // Receive confirmation message
-    ssize_t bytes_received = recv(sockfd, buffer, BUFFER_SIZE, 0);
-    if (bytes_received < 0)
-    {
-        p_error("Receive failed");
-        return -1;
-    }
-    else if (bytes_received == 0)
-    {
-        printf("Server closed connection\n");
-        close(sockfd);
-    }
-    else
-    {
-        buffer[bytes_received] = '\0';
-        printf("Server: %s\n", buffer);
-    }
+    // printf("File closed. Waiting for confirmation...\n");
+    // // Receive confirmation message
+    // ssize_t bytes_received = recv(sockfd, buffer, BUFFER_SIZE, 0);
+    // if (bytes_received < 0)
+    // {
+    //     p_error("Receive failed");
+    //     return -1;
+    // }
+    // else if (bytes_received == 0)
+    // {
+    //     printf("Server closed connection\n");
+    //     close(sockfd);
+    // }
+    // else
+    // {
+    //     buffer[bytes_received] = '\0';
+    //     printf("Server: %s\n", buffer);
+    // }
 
     return 0;
 }
@@ -249,7 +249,7 @@ int main(int argc, char *argv[])
     // sockfd = init_udp();
     // servaddr.sin_port = htons(config->udp_destination_port);
 
-    // [2] connect to server
+    // [2] connect to server no need
     // if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     // {
     //     p_error("UDP Connection Failed\n");
@@ -259,7 +259,7 @@ int main(int argc, char *argv[])
     // char low_entropy_data[PACKET_SIZE];
     // memset(low_entropy_data, 0, sizeof(low_entropy_data));
 
-    // [4] Generate high entropy data (random numbers)
+    // [4] Generate high entropy data (random numbers), rand to a file
     // srand(time(NULL));
     // char high_entropy_data[PACKET_SIZE - sizeof(uint16_t)];
     // for (int i = 0; i < sizeof(high_entropy_data); ++i)

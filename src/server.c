@@ -60,9 +60,9 @@ int process_config(int connfd, char *config)
     // char *config; // recive config here
     // config = (char *)malloc(sizeof(char) * 512);
     ssize_t bytes_received;
-    while ((bytes_received = recv(connfd, buffer, BUFFER_SIZE - 1, 0)) > 0)
+    while ((bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0)) > 0)
     {
-        // printf("Bytes: %ld", bytes_received);
+        printf("Bytes: %ld", bytes_received);
         if (bytes_received == 0)
         {
             printf("Client closed connection unexpectedly\n");
@@ -71,9 +71,6 @@ int process_config(int connfd, char *config)
         strcat(config, buffer);
     }
     printf("Buffer: %s\n", buffer);
-    // Send confirmation message
-    // char confirm[] = "Recieved";
-    // send(connfd, confirm, strlen(confirm), 0);
     close(connfd);
     return 0;
 }

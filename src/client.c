@@ -156,9 +156,10 @@ int send_file(int sockfd)
 
     ssize_t bytes = 0;
     char buffer[BUFFER_SIZE] = {0};
-    while (fgets(buffer, BUFFER_SIZE, config_file) != NULL || bytes != -1)
+    while (fgets(buffer, BUFFER_SIZE, config_file) != NULL)
     {
         bytes = send(sockfd, buffer, BUFFER_SIZE, 0);
+        printf("buffer: %s", buffer);
         memset(buffer, 0, BUFFER_SIZE);
     }
 

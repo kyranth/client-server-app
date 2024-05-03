@@ -56,6 +56,28 @@ int init_udp()
     return sockfd;
 }
 
+Config *createConfig()
+{
+    Config *config = malloc(sizeof(Config));
+    if (config == NULL)
+    {
+        perror("Failed to allocate memory for Config");
+        exit(1);
+    }
+
+    // Allocate memory for server_ip_address
+    config->server_ip_address = malloc(16 * sizeof(char)); // Assuming IPv4 address, so 15 characters + null terminator
+    // config->tcp_pre_probing_port = malloc(8 * sizeof(char));
+
+    if (config->server_ip_address == NULL)
+    {
+        perror("Failed to allocate memory for server_ip_address");
+        exit(1);
+    }
+
+    return config;
+}
+
 /**
  * @brief Takes connfd and receives config file over socket connection.
  *
@@ -180,13 +202,15 @@ int main()
     }
 
     /** Pre-Probing Phase: Receive and process config file */
-    char *config_file[] = "recv_config.json";
+    char *config_file = {"recv_config.json"};
     int process = getConfigFile(connfd, config_file); // Close TCP connection if successful
     if (process < 0)
     {
         p_error("ERROR: Didn't receive config file\n");
     }
-    Config *config;
+
+    // Config struct
+    Config *config = createConfig();
     setConfig(config_file, config);
 
     /** Probing Phase: Receive packet trains */

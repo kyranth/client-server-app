@@ -21,7 +21,7 @@ client: $(src)/client.c
 	$(CC) $(CFLAGS) -o client $(src)/client.c $(OBJECTS)
 
 server: $(src)/server.c
-	$(CC) $(CFLAGS) -o server $(src)/server.c
+	$(CC) $(CFLAGS) -o server $(src)/server.c $(OBJECTS)
 
 clean:
 	rm -f *.o *.so client server

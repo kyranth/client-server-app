@@ -12,6 +12,7 @@
 
 #define SERVER_PORT 7777
 #define BUFFER_SIZE 1024
+#define PAYLOAD_SIZE 1000
 
 // Structure definition
 typedef struct
@@ -41,6 +42,7 @@ int init_tcp()
     if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
     {
         p_error("ERROR: TCP Socket creation failed\n");
+        return -1;
     }
     return sockfd;
 }
@@ -52,6 +54,7 @@ int init_udp()
     if ((sockfd = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
     {
         p_error("ERROR: UDP Socket creation failed\n");
+        return -1;
     }
     return sockfd;
 }
@@ -109,6 +112,7 @@ int getConfigFile(int connfd, const char *config_file)
     // Close file
     fclose(fp);
     // Close connection file descriptor
+    printf("Successfully received config file. Closing TCP Connection...\n");
     close(connfd);
     return 0;
 }
@@ -170,10 +174,7 @@ int main()
     struct sockaddr_in servaddr, cliaddr;
 
     /** Create TCP socket */
-    if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0)
-    {
-        p_error("Socket creation failed");
-    }
+    sockfd = init_tcp();
 
     /** Set server address */
     memset(&servaddr, 0, sizeof(servaddr));
@@ -207,18 +208,44 @@ int main()
     {
         p_error("ERROR: Didn't receive config file\n");
     }
+    close(sockfd);
 
     // Config struct
     Config *config = createConfig();
     setConfig(config_file, config);
 
+    sockfd = init_udp();
+    cliaddr.sin_port = htons(config->udp_source_port);
+    servaddr.sin_port = htons(config->udp_destination_port);
+
+    // Bind for UDP socket connection
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    {
+        p_error("ERROR: Bind Failure\n");
+    }
+
     /** Probing Phase: Receive packet trains */
-    // struct timeval t1, t2; // time variables
-    // char buffer[BUFFER_SIZE];
-    // int n = recvfrom(sockfd, (char *)buffer, BUFFER_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-    // buffer[n] = '\0';
-    // gettimeofday(&t1, NULL); // Record arrival time of first packet
-    // printf("First packet received: %s\n", buffer);
+    struct timeval first, last; // time variables
+    char buffer[PAYLOAD_SIZE];
+    int n;
+    int count = 1;
+    gettimeofday(&first, NULL);
+    while (count != 10)
+    {
+        n = recvfrom(sockfd, (char *)buffer, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+        if (n > 0)
+        {
+            printf("Received packet with ID: %d\n", ntohs(*(uint16_t *)buffer));
+            printf("%s\n", buffer); // TODO: Buffer is black
+        }
+        else
+        {
+            printf("Encountered an error\n");
+            break;
+        }
+        count++;
+    }
+    gettimeofday(&last, NULL);
 
     // Receiving second UDP packet
     // int n = recvfrom(sockfd, (char *)buffer, BUFFER_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
@@ -229,9 +256,10 @@ int main()
     /** Post-Probing Phase: Check for compression and Send findings */
     // double low_entropy_time, high_entropy_time;
 
-    // low_entropy_time = (end_time_low.tv_sec - start_time_low.tv_sec) * 1000.0 + (end_time_low.tv_usec - start_time_low.tv_usec) / 1000.0;
+    long microseconds = last.tv_usec - first.tv_usec;
     // high_entropy_time = (end_time_high.tv_sec - start_time_high.tv_sec) * 1000.0 + (end_time_high.tv_usec - start_time_high.tv_usec) / 1000.0;
 
+    printf("Elapsed time: %ld\n", microseconds);
     // char result[25];
     // if ((high_entropy_time - low_entropy_time) > THRESHOLD) // TODO: check for miliseconds or seconds
     // {
@@ -248,5 +276,6 @@ int main()
     /** Close TCP connection */
     close(sockfd);
 
+    printf("Connection closed\n");
     return 0;
 }

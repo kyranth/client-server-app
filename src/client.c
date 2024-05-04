@@ -207,23 +207,30 @@ int main(int argc, char *argv[])
     }
     char *config_file = argv[1]; // Get config file from command line
 
-    struct sockaddr_in servaddr; // Create socket file descriptors
+    struct sockaddr_in servaddr, cliaddr;
 
     /** Initialize a config structure to NULL values */
     Config *config = createConfig();
 
     /** Read the config file for server IP and fill it with JSON data */
     setConfig(config_file, config);
-    printf("Server IP/Port: %s/%d\n", config->server_ip_address, config->tcp_pre_probing_port);
 
     /** Init TCP Connection */
     int sockfd = init_tcp();
+
+    // Enable DF flag
+    int enable = 1;
+    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
+    {
+        p_error("setsockopt failed\n");
+    }
 
     /** Set server address */
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_pre_probing_port);
+    printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     /** Connect to server */
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
@@ -238,23 +245,41 @@ int main(int argc, char *argv[])
         p_error("Couldn't send config file\n");
     }
     close(sockfd); // TCP Connection
+    printf("TCP Closed. Initiating UDP...\n");
 
     /** Probing Phase: Sending low and high entropy data */
     // [1] Initiate UDP Connection
-    // sockfd = init_udp();
-    // servaddr.sin_port = htons(config->udp_destination_port);
-
-    // [2] connect to server no need
-    // if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
-    // {
-    //     p_error("UDP Connection Failed\n");
-    // }
+    sockfd = init_udp();
+    cliaddr.sin_family = AF_INET;
+    cliaddr.sin_port = htons(config->udp_source_port);
+    servaddr.sin_port = htons(config->udp_destination_port);
+    printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     // [3] Generate low entropy data (all 0s)
-    // char low_entropy_data[PACKET_SIZE];
-    // memset(low_entropy_data, 0, sizeof(low_entropy_data));
+    char buffer[PACKET_SIZE];
 
-    // [4] Generate high entropy data (random numbers), rand to a file
+    // Send low entropy data packet
+    int count = 1;
+    while (count != 11)
+    {
+        // Prepare packet payload with packet ID
+        uint16_t packet_id_network_order = htons(count);
+        memcpy(buffer, &packet_id_network_order, sizeof(uint16_t));
+        memset(buffer + sizeof(uint16_t), 0, PACKET_SIZE - sizeof(uint16_t)); // TODO: check Fill the rest with zeros
+
+        // Send
+        sendto(sockfd, buffer, PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+        printf("Sent packet with ID: %d\n", count);
+        printf("%s\n", buffer);
+        sleep(1);
+        count++;
+    }
+
+    // [7] Wait before sending high entropy data
+    // sleep(INTER_MEASUREMENT_TIME);
+
+    // [8] Send high entropy data packet
+    // Generate high entropy data (random numbers), rand to a file
     // srand(time(NULL));
     // char high_entropy_data[PACKET_SIZE - sizeof(uint16_t)];
     // for (int i = 0; i < sizeof(high_entropy_data); ++i)
@@ -262,18 +287,9 @@ int main(int argc, char *argv[])
     //     high_entropy_data[i] = rand() % 256;
     // }
 
-    // [5] Construct and send packet train
-
-    // [6] Send low entropy data packet
-
-    // [7] Wait before sending high entropy data
-    // sleep(INTER_MEASUREMENT_TIME);
-
-    // [8] Send high entropy data packet
-
     /** Post Probing Phase: Calculate compression; done on Server */
-    // close(sockfd);
-
+    close(sockfd);
     free(config); // Release config
+    printf("Connection closed\n");
     return 0;
 }

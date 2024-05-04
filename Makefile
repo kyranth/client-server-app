@@ -24,7 +24,7 @@ server: $(src)/server.c
 	$(CC) $(CFLAGS) -o server $(src)/server.c $(OBJECTS)
 
 clean:
-	rm -f *.o *.so client server
+	rm -f *.o *.so client server recv_config.json
 
 run:
 	./client config.json

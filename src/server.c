@@ -29,6 +29,12 @@ typedef struct
     int udp_packet_ttl;
 } Config;
 
+typedef struct
+{
+    uint16_t packet_id;
+    char payload[PAYLOAD_SIZE - sizeof(uint16_t)];
+} UDP_Packet;
+
 void p_error(const char *msg)
 {
     perror(msg);
@@ -226,24 +232,27 @@ int main()
 
     /** Probing Phase: Receive packet trains */
     struct timeval first, last; // time variables
-    char buffer[PAYLOAD_SIZE];
     int n;
-    int count = 1;
+    UDP_Packet packet;
     gettimeofday(&first, NULL);
-    while (count != 10)
+    for (int i = 0; i < 10; i++)
     {
-        n = recvfrom(sockfd, (char *)buffer, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
+        n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
         if (n > 0)
         {
-            printf("Received packet with ID: %d\n", ntohs(*(uint16_t *)buffer));
-            printf("%s\n", buffer); // TODO: Buffer is black
+            printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
+            printf("Payload: ");
+            for (int j = 0; j < sizeof(packet.payload); j++)
+            {
+                printf("%d", packet.payload[j]);
+            }
+            printf("\n\n");
         }
         else
         {
             printf("Encountered an error\n");
             break;
         }
-        count++;
     }
     gettimeofday(&last, NULL);
 

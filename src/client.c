@@ -9,7 +9,6 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <sys/time.h>
 #include <time.h>
 
 #define BUFFER_SIZE 1024
@@ -32,6 +31,12 @@ typedef struct
     int num_udp_packets;
     int udp_packet_ttl;
 } Config;
+
+typedef struct
+{
+    uint16_t packet_id;
+    char payload[PACKET_SIZE - sizeof(uint16_t)];
+} UDP_Packet;
 
 Config *createConfig()
 {
@@ -179,24 +184,6 @@ int send_ConfigFile(int sockfd)
     return 0;
 }
 
-void send_packet_train(int sockfd, struct sockaddr_in servaddr, int entropy)
-{
-    char packet[PACKET_SIZE];
-    struct timeval start_time, end_time;
-
-    gettimeofday(&start_time, NULL);
-    for (int i = 0; i < 2; ++i)
-    {
-        memset(packet, 0, PACKET_SIZE);
-        *(uint16_t *)packet = htons(i); // Packet ID
-        sendto(sockfd, packet, PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
-    }
-    gettimeofday(&end_time, NULL);
-
-    if (entropy)
-        sleep(INTER_MEASUREMENT_TIME); // Wait before sending high entropy data
-}
-
 int main(int argc, char *argv[])
 {
     /** Check for command line arguments */
@@ -256,23 +243,21 @@ int main(int argc, char *argv[])
     printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     // [3] Generate low entropy data (all 0s)
-    char buffer[PACKET_SIZE];
+    UDP_Packet packet[10];
 
     // Send low entropy data packet
-    int count = 1;
-    while (count != 11)
+    for (int i = 0; i < 10; i++)
     {
         // Prepare packet payload with packet ID
-        uint16_t packet_id_network_order = htons(count);
-        memcpy(buffer, &packet_id_network_order, sizeof(uint16_t));
-        memset(buffer + sizeof(uint16_t), 0, PACKET_SIZE - sizeof(uint16_t)); // TODO: check Fill the rest with zeros
+        packet[i].packet_id = htons(i + 1);
+        memset(packet[i].payload, 0, sizeof(packet[i].payload));
 
         // Send
-        sendto(sockfd, buffer, PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
-        printf("Sent packet with ID: %d\n", count);
-        printf("%s\n", buffer);
+        sendto(sockfd, &packet[i], PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+        printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
+
+        // Prevent sending packets too fast
         sleep(1);
-        count++;
     }
 
     // [7] Wait before sending high entropy data

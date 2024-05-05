@@ -236,7 +236,7 @@ int main()
     UDP_Packet packet;
     gettimeofday(&first, NULL);
     int num_packets = config->num_udp_packets;
-    for (int i = 0; i < num_packets; ++i)
+    for (int i = 0; i < num_packets - 1; ++i)
     {
         if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
         {

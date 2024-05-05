@@ -243,6 +243,11 @@ int main()
             printf("Encountered an error\n");
             break;
         }
+        else if (n == 0)
+        {
+            printf("Client closed connection\n");
+            break;
+        }
 
         printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
         // printf("Payload: ");

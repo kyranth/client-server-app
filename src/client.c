@@ -1,7 +1,7 @@
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
 #include "../lib/cJSON.h"
 #include <arpa/inet.h>
 #include <sys/socket.h>
@@ -9,7 +9,7 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <time.h>
+// #include <time.h>
 
 #define BUFFER_SIZE 1024
 #define THRESHOLD 100
@@ -248,13 +248,14 @@ int main(int argc, char *argv[])
     }
 
     // [3] Generate low entropy data (all 0s)
-    UDP_Packet packet[10];
+    int num_packets = config->num_udp_packets;
+    UDP_Packet packet[num_packets];
 
     // Send low entropy data packet
-    for (int i = 0; i < 10; i++)
+    for (int i = 0; i < num_packets; i++)
     {
         // Prepare packet payload with packet ID
-        packet[i].packet_id = htons(i + 1);
+        packet[i].packet_id = htons(i);
         memset(packet[i].payload, 0, sizeof(packet[i].payload));
 
         // Send
@@ -262,7 +263,7 @@ int main(int argc, char *argv[])
         printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
 
         // Prevent sending packets too fast
-        sleep(1);
+        usleep(100000); // 200 Millisec
     }
 
     // [7] Wait before sending high entropy data

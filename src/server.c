@@ -235,24 +235,22 @@ int main()
     int n;
     UDP_Packet packet;
     gettimeofday(&first, NULL);
-    for (int i = 0; i < 10; i++)
+    int num_packets = config->num_udp_packets;
+    for (int i = 0; i < num_packets; ++i)
     {
-        n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-        if (n > 0)
-        {
-            printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
-            printf("Payload: ");
-            for (int j = 0; j < sizeof(packet.payload); j++)
-            {
-                printf("%d", packet.payload[j]);
-            }
-            printf("\n\n");
-        }
-        else
+        if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
             printf("Encountered an error\n");
             break;
         }
+
+        printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
+        // printf("Payload: ");
+        // for (int j = 0; j < sizeof(packet.payload); j++)
+        // {
+        //     printf("%d", packet.payload[j]);
+        // }
+        // printf("\n\n");
     }
     gettimeofday(&last, NULL);
 

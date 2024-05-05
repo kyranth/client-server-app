@@ -225,7 +225,7 @@ int main()
     servaddr.sin_port = htons(config->udp_destination_port);
 
     // Bind for UDP socket connection
-    if (bind(sockfd, (const struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
         p_error("ERROR: Bind Failure\n");
     }

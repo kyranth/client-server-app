@@ -242,6 +242,11 @@ int main(int argc, char *argv[])
     servaddr.sin_port = htons(config->udp_destination_port);
     printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
+    if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    {
+        p_error("ERROR: Bind failed\n");
+    }
+
     // [3] Generate low entropy data (all 0s)
     UDP_Packet packet[10];
 

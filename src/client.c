@@ -232,6 +232,8 @@ int main(int argc, char *argv[])
         p_error("Couldn't send config file\n");
     }
     close(sockfd); // TCP Connection
+    memset(&servaddr, 0, sizeof(servaddr));
+    memset(&cliaddr, 0, sizeof(cliaddr));
     printf("TCP Closed. Initiating UDP...\n");
 
     /** Probing Phase: Sending low and high entropy data */
@@ -239,6 +241,9 @@ int main(int argc, char *argv[])
     sockfd = init_udp();
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->udp_destination_port);
     printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
@@ -263,7 +268,7 @@ int main(int argc, char *argv[])
         printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
 
         // Prevent sending packets too fast
-        usleep(100000); // 200 Millisec
+        usleep(50000); // 100 Millisec
     }
 
     // [7] Wait before sending high entropy data

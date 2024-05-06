@@ -10,10 +10,6 @@
 #include <netinet/tcp.h>
 #include <sys/time.h>
 
-#define SERVER_PORT 7777
-#define BUFFER_SIZE 1024
-#define PAYLOAD_SIZE 1000
-
 // Structure definition
 typedef struct
 {
@@ -30,6 +26,7 @@ typedef struct
     int udp_packet_ttl;
 } Config;
 
+// UDP packet structure
 typedef struct
 {
     uint16_t packet_id;
@@ -95,9 +92,10 @@ int getConfigFile(int connfd, const char *config_file)
     fp = fopen(config_file, "w");
 
     // Hold incoming data
-    char buffer[BUFFER_SIZE];
+    ssize_t buffer_size = 1024;
+    char buffer[1014];
     ssize_t bytes_received;
-    while ((bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0)) > 0)
+    while ((bytes_received = recv(connfd, buffer, buffer_size, 0)) > 0)
     {
         if (bytes_received == 0)
         {
@@ -110,7 +108,7 @@ int getConfigFile(int connfd, const char *config_file)
             return -1;
         }
         fprintf(fp, "%s", buffer);
-        memset(buffer, 0, BUFFER_SIZE);
+        memset(buffer, 0, buffer_size);
     }
     close(connfd);
 
@@ -138,7 +136,7 @@ void setConfig(const char *file, Config *config)
     }
 
     // read the file contents into a string
-    char buffer[BUFFER_SIZE];
+    char buffer[1024];
     fread(buffer, 1, sizeof(buffer), fp);
     fclose(fp);
 
@@ -172,8 +170,22 @@ void setConfig(const char *file, Config *config)
     cJSON_Delete(json);
 }
 
-int main()
+/**
+ * @brief Main function responsible for the client application.
+ *
+ * @param argc
+ * @param argv
+ */
+int main(int argc, char *argv[])
 {
+    /** Check for command line arguments */
+    if (argc < 1)
+    {
+        printf("Error: Expected (1) argument Server Port\n");
+        exit(0);
+    }
+    int server_port = atoi(argv[1]); // Get server port from command line
+
     /** --------- Create socket connection --------- */
     int sockfd, connfd;
     struct sockaddr_in servaddr, cliaddr;
@@ -185,7 +197,7 @@ int main()
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(SERVER_PORT);
+    servaddr.sin_port = htons(server_port);
 
     // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
@@ -264,6 +276,7 @@ int main()
     printf("Incoming Low Entropy Packet Train: (%s/%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
     gettimeofday(&first, NULL); // Record first packet arrival time
 
+    // Receive low entropy data
     for (int i = 0; i < num_packets - 1; ++i)
     {
         if ((bytes_received = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
@@ -276,7 +289,7 @@ int main()
             printf("Client closed connection\n");
             break;
         }
-        printf("Low Entropy : %d packets received!\r", ntohs(packet.packet_id));
+        printf("Low Entropy : %d packets received!\r", ntohs(packet->packet_id));
         fflush(stdout);
         memset(&packet, 0, sizeof(packet)); // reset packets
     }
@@ -290,27 +303,23 @@ int main()
     // Receive high entropy data
     sockfd = init_udp();
 
-    // Set timeout in seconds
-    struct timeval timeout;
-    timeout.tv_sec = 10;
-    timeout.tv_usec = 0;
+    // Set timeout
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
     {
-        perror("setsockopt (receive timeout) failed");
-        exit(EXIT_FAILURE);
+        p_error("ERROR: Receive timeout) failed");
     }
 
     // Enable Don't Fragment flag
-    int enable = 1;
     if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
     {
-        p_error("setsockopt failed\n");
+        p_error("ERROR: Don't fragment failed\n");
     }
 
+    // Receive high entropy data
     gettimeofday(&first, NULL); // Record first packet arrival time
     for (int i = 0; i < num_packets - 1; ++i)
     {
-        if ((bytes_received; = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
+        if ((bytes_received = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
             printf("ERROR: Couldn't receive packet!\n");
             break;
@@ -321,7 +330,7 @@ int main()
             break;
         }
 
-        printf("Low Entropy : %d packets received!\r", ntohs(packet.packet_id));
+        printf("Low Entropy : %d packets received!\r", ntohs(packet->packet_id));
         fflush(stdout);
         memset(&packet, 0, sizeof(packet)); // reset packets
     }

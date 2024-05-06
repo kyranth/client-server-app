@@ -18,11 +18,12 @@
 typedef struct
 {
     char *server_ip_address;
-    int tcp_pre_probing_port;
     int udp_source_port;
     int udp_destination_port;
     int tcp_head_syn_port;
     int tcp_tail_syn_port;
+    int tcp_pre_probing_port;
+    int tcp_post_probing_port;
     int udp_payload_size;
     int inter_measurement_time;
     int num_udp_packets;
@@ -70,19 +71,15 @@ Config *createConfig()
     Config *config = malloc(sizeof(Config));
     if (config == NULL)
     {
-        perror("Failed to allocate memory for Config");
-        exit(1);
+        p_error("ERROR: Failed to allocate memory for Config");
     }
-
     // Allocate memory for server_ip_address
     config->server_ip_address = malloc(16 * sizeof(char));
 
     if (config->server_ip_address == NULL)
     {
-        perror("Failed to allocate memory for server_ip_address");
-        exit(1);
+        p_error("ERROR: Failed to allocate memory for server_ip_address");
     }
-
     return config;
 }
 
@@ -117,6 +114,7 @@ int getConfigFile(int connfd, const char *config_file)
     }
     // Close file
     fclose(fp);
+
     // Close connection file descriptor
     printf("Successfully received config file. Closing TCP Connection...\n");
     close(connfd);
@@ -156,13 +154,13 @@ void setConfig(const char *file, Config *config)
     }
     else
     {
-        strcpy(config->server_ip_address,
-               cJSON_GetObjectItemCaseSensitive(json, "server_ip_address")->valuestring);
-        config->tcp_pre_probing_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_pre_probing_port")->valueint;
+        strcpy(config->server_ip_address, cJSON_GetObjectItemCaseSensitive(json, "server_ip_address")->valuestring);
         config->udp_source_port = cJSON_GetObjectItemCaseSensitive(json, "udp_source_port")->valueint;
         config->udp_destination_port = cJSON_GetObjectItemCaseSensitive(json, "udp_destination_port")->valueint;
         config->tcp_head_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_head_syn_port")->valueint;
         config->tcp_tail_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_tail_syn_port")->valueint;
+        config->tcp_pre_probing_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_pre_probing_port")->valueint;
+        config->tcp_post_probing_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_post_probing_port")->valueint;
         config->udp_payload_size = cJSON_GetObjectItemCaseSensitive(json, "udp_payload_size")->valueint;
         config->inter_measurement_time = cJSON_GetObjectItemCaseSensitive(json, "inter_measurement_time")->valueint;
         config->num_udp_packets = cJSON_GetObjectItemCaseSensitive(json, "num_udp_packets")->valueint;
@@ -175,51 +173,54 @@ void setConfig(const char *file, Config *config)
 
 int main()
 {
-    /** Create socket connection */
+    /** --------- Create socket connection --------- */
     int sockfd, connfd;
     struct sockaddr_in servaddr, cliaddr;
 
-    /** Create TCP socket */
+    // Create TCP socket
     sockfd = init_tcp();
 
-    /** Set server address */
+    // Set server address
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     servaddr.sin_port = htons(SERVER_PORT);
 
-    /** Bind socket */
+    // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
-        p_error("Bind failed");
+        p_error("ERROR: Bind failed\n");
     }
 
-    /** Listen for connections */
+    // Listen for connections
     if (listen(sockfd, 5) < 0)
     {
-        p_error("Listen failed");
+        p_error("ERROR: Listen failed\n");
     }
 
-    /** Accept incoming connection */
+    // Accept incoming connection
     socklen_t len = sizeof(cliaddr);
     if ((connfd = accept(sockfd, (struct sockaddr *)&cliaddr, &len)) < 0)
     {
-        p_error("Accept failed");
+        p_error("ERROR: Accept failed\n");
     }
 
-    /** Pre-Probing Phase: Receive and process config file */
+    /** --------- End of TCP Socket Setup --------- */
+    /** --------- Pre-Probing Phase: Receive and process config file --------- */
+    // Config File
     char *config_file = {"recv_config.json"};
-    int process = getConfigFile(connfd, config_file); // Close TCP connection if successful
+    int process = getConfigFile(connfd, config_file); /* Close TCP connection if successful */
     if (process < 0)
     {
         p_error("ERROR: Didn't receive config file\n");
     }
     close(sockfd);
 
-    // Config struct
+    // Create and setup config variables
     Config *config = createConfig();
     setConfig(config_file, config);
 
+    // Initiate UDP Socket Connection
     sockfd = init_udp();
     cliaddr.sin_port = htons(config->udp_source_port);
     servaddr.sin_port = htons(config->udp_destination_port);
@@ -230,11 +231,13 @@ int main()
         p_error("ERROR: Bind Failure\n");
     }
 
-    /** Probing Phase: Receive packet trains */
+    /** --------- End of Pre-Probing Phase --------- */
+    /** --------- Probing Phase: Receive Low Entropy Packet Train --------- */
     struct timeval low, high;
-    struct timeval first, last; // time variables
-    int n;
+    struct timeval first, last;
+
     UDP_Packet packet;
+    int n;
     int num_packets = config->num_udp_packets;
 
     // Receive low entropy data
@@ -281,7 +284,7 @@ int main()
             break;
         }
 
-        printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
+        // printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
         // printf("Payload: ");
         // for (int j = 0; j < sizeof(packet.payload); j++)
         // {
@@ -290,29 +293,41 @@ int main()
         // printf("\n\n");
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
-    printf("High Entropy received\n");
+    printf("High entropy packets received!\n");
     high.tv_sec = last.tv_sec - first.tv_sec;
 
     printf("Delta Low: %ld\n", low.tv_sec);
     printf("Delta High: %ld\n", high.tv_sec);
-
     printf("D_High - D_Low: %ld\n", high.tv_sec - low.tv_sec);
 
-    /** Post-Probing Phase: Check for compression and Send findings */
-    // char result[25];
-    // if ((high_entropy_time - low_entropy_time) > THRESHOLD) // TODO: check for miliseconds or seconds
-    // {
-    // strcpy(result, "Compression detected!");
-    //     send(connfd, result, strlen(result), 0);
-    // }
-    // else
-    // {
-    // strcpy(result, "No Compression detected!");
-    //     send(connfd, result, strlen(result), 0);
-    // }
+    close(sockfd); /* Close UDP Socket Connection */
+
+    /** --------- End of Probing Phase --------- */
+    /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
+
+    sockfd = init_tcp();
+    servaddr.sin_port = htons(config->tcp_post_probing_port);
+
+    if (connect(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    {
+        p_error("TCP Connection Failed\n");
+    }
+
+    char result[] = {"Compression detected!", "No Compression detected!"};
+
+    if ((high.tv_sec - low.tv_sec) > config->inter_measurement_time)
+    {
+        send(connfd, result[0], strlen(result[0]), 0);
+    }
+    else
+    {
+        send(connfd, result[1], strlen(result[1]), 0);
+    }
+    printf("Result Sent!\n");
 
     /** Close TCP connection */
     close(sockfd);
+    free(config);
 
     printf("Connection closed\n");
     return 0;

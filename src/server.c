@@ -33,7 +33,7 @@ typedef struct
 typedef struct
 {
     uint16_t packet_id;
-    char payload[PAYLOAD_SIZE - sizeof(uint16_t)];
+    char *payload;
 } UDP_Packet;
 
 void p_error(const char *msg)
@@ -112,12 +112,13 @@ int getConfigFile(int connfd, const char *config_file)
         fprintf(fp, "%s", buffer);
         memset(buffer, 0, BUFFER_SIZE);
     }
+    close(connfd);
+
     // Close file
     fclose(fp);
 
     // Close connection file descriptor
-    printf("Successfully received config file. Closing TCP Connection...\n");
-    close(connfd);
+    printf("Successfully received config file. TCP Connection Closed!\n");
     return 0;
 }
 
@@ -233,104 +234,151 @@ int main()
 
     /** --------- End of Pre-Probing Phase --------- */
     /** --------- Probing Phase: Receive Low Entropy Packet Train --------- */
+
+    // Set timeout in seconds
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
+    {
+        p_error("setsockopt (receive timeout) failed");
+    }
+
+    // Enable Don't Fragment flag
+    int enable = 1;
+    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
+    {
+        p_error("setsockopt failed\n");
+    }
+
     struct timeval low, high;
     struct timeval first, last;
 
-    UDP_Packet packet;
-    int n;
-    int num_packets = 100;
+    UDP_Packet *packet = malloc(sizeof(UDP_Packet));
+    ssize_t payload_size = (ssize_t)config->udp_payload_size;
+    packet->payload = malloc(payload_size - sizeof(uint16_t));
 
-    // Receive low entropy data
+    int num_packets = 100;
+    ssize_t bytes_received;
+
+    printf("Incoming Low Entropy Packet Train: (%s/%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
     gettimeofday(&first, NULL); // Record first packet arrival time
+
     for (int i = 0; i < num_packets - 1; ++i)
     {
-        if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
+        if ((bytes_received = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
-            printf("ERROR: Received a negative value\n");
+            printf("ERROR: Couldn't receive packet!\n");
             break;
         }
-        else if (n == 0)
+        else if (bytes_received == 0)
         {
             printf("Client closed connection\n");
             break;
         }
-
-        printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
-        // printf("Payload: ");
-        // for (int j = 0; j < sizeof(packet.payload); j++)
-        // {
-        //     printf("%d", packet.payload[j]);
-        // }
-        // printf("\n\n");
+        printf("Low Entropy : %d packets received!\r", ntohs(packet.packet_id));
+        fflush(stdout);
+        memset(&packet, 0, sizeof(packet)); // reset packets
     }
+
+    printf("\n");
+    close(sockfd);
     gettimeofday(&last, NULL); // Record the last packet arrival time
-    printf("Low Entropy received\n");
 
     low.tv_sec = last.tv_sec - first.tv_sec;
-    memset(&packet, 0, sizeof(packet)); // reset packets
 
     // Receive high entropy data
+    sockfd = init_udp();
+
+    // Set timeout in seconds
+    struct timeval timeout;
+    timeout.tv_sec = 10;
+    timeout.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
+    {
+        perror("setsockopt (receive timeout) failed");
+        exit(EXIT_FAILURE);
+    }
+
+    // Enable Don't Fragment flag
+    int enable = 1;
+    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
+    {
+        p_error("setsockopt failed\n");
+    }
+
     gettimeofday(&first, NULL); // Record first packet arrival time
     for (int i = 0; i < num_packets - 1; ++i)
     {
-        if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
+        if ((bytes_received; = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
-            printf("Encountered an error\n");
+            printf("ERROR: Couldn't receive packet!\n");
             break;
         }
-        else if (n == 0)
+        else if (bytes_received == 0)
         {
             printf("Client closed connection\n");
             break;
         }
 
-        printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
-        // printf("Payload: ");
-        // for (int j = 0; j < sizeof(packet.payload); j++)
-        // {
-        //     printf("%d", packet.payload[j]);
-        // }
-        // printf("\n\n");
+        printf("Low Entropy : %d packets received!\r", ntohs(packet.packet_id));
+        fflush(stdout);
+        memset(&packet, 0, sizeof(packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
+
     printf("High entropy packets received!\n");
     high.tv_sec = last.tv_sec - first.tv_sec;
 
+    close(sockfd);
+
+    /** --------- End of Probing Phase --------- */
+    /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
     printf("Delta Low: %ld\n", low.tv_sec);
     printf("Delta High: %ld\n", high.tv_sec);
     printf("D_High - D_Low: %ld\n", high.tv_sec - low.tv_sec);
 
-    close(sockfd); /* Close UDP Socket Connection */
-
-    /** --------- End of Probing Phase --------- */
-    /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
-
     sockfd = init_tcp();
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
-    printf("IP/Port: %s/%d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
+    printf("Post Probing Phase: Initiating TCP Connection (%s/%d)...\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
 
-    if (connect(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    // Bind TCP socket
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
-        p_error("TCP Connection Failed\n");
+        p_error("ERROR: Bind failed\n");
+    }
+
+    // Listen for connections
+    if (listen(sockfd, 5) < 0)
+    {
+        p_error("ERROR: Listen failed\n");
+    }
+
+    // Accept incoming connection
+    len = sizeof(servaddr);
+    if ((connfd = accept(sockfd, (struct sockaddr *)&servaddr, &len)) < 0)
+    {
+        p_error("ERROR: Accept failed\n");
     }
 
     if ((high.tv_sec - low.tv_sec) > config->inter_measurement_time)
     {
         char compression[] = {"Compression detected!"};
-        send(sockfd, compression, strlen(compression), 0);
+        send(connfd, compression, strlen(compression), 0);
     }
     else
     {
         char no_compression[] = {"No Compression detected!"};
-        send(sockfd, no_compression, strlen(no_compression), 0);
+        send(connfd, no_compression, strlen(no_compression), 0);
     }
     printf("Result Sent!\n");
 
     /** Close TCP connection */
     close(sockfd);
+    close(connfd);
     free(config);
 
-    printf("Connection closed\n");
+    printf("Server Concluded!\n");
     return 0;
 }

@@ -243,7 +243,7 @@ int main()
     {
         if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
-            printf("Encountered an error\n");
+            printf("ERROR: Received a negative value\n");
             break;
         }
         else if (n == 0)
@@ -261,8 +261,9 @@ int main()
         // printf("\n\n");
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
+    printf("Low Entropy received\n");
 
-    low.tv_usec = last.tv_usec - first.tv_usec;
+    low.tv_sec = last.tv_sec - first.tv_sec;
     memset(&packet, 0, sizeof(packet)); // reset packets
 
     // Receive high entropy data
@@ -289,10 +290,13 @@ int main()
         // printf("\n\n");
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
+    printf("High Entropy received\n");
     high.tv_sec = last.tv_sec - first.tv_sec;
 
-    printf("Elapsed time: %ld\n", low.tv_usec);
+    printf("Delta Low: %ld\n", low.tv_sec);
     printf("Delta High: %ld\n", high.tv_sec);
+
+    printf("D_High - D_Low: %ld\n", high.tv_sec - low.tv_sec);
 
     /** Post-Probing Phase: Check for compression and Send findings */
     // char result[25];

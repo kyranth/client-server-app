@@ -255,10 +255,9 @@ int main(int argc, char *argv[])
     }
 
     // [3] Send low entropy data packet
+    printf("Starting Low Entropy...\n");
     int num_packets = config->num_udp_packets;
     UDP_Packet packet[num_packets];
-
-    /*
     for (int i = 0; i < num_packets; i++)
     {
         // Prepare packet payload with packet ID
@@ -275,9 +274,12 @@ int main(int argc, char *argv[])
         usleep(50000); // 50 Millisec
     }
 
+    printf("Low Entropy sent\n");
+    printf("Waiting for inter measurement time...\n");
+
     // [7] Wait before sending high entropy data
-    sleep(INTER_MEASUREMENT_TIME);
-    */
+    sleep(15);
+    printf("Starting High Entropy...\n");
 
     // Read random file
     memset(&packet, 0, sizeof(packet));
@@ -299,11 +301,12 @@ int main(int argc, char *argv[])
 
         // Send
         sendto(sockfd, &packet[i], PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
-        printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
+        // printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
 
         // Prevent sending packets too fast
         usleep(50000); // 50 Millisec
     }
+    printf("High Entropy sent\n");
 
     /** Post Probing Phase: Calculate compression; done on Server */
     close(sockfd);

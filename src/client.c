@@ -313,6 +313,7 @@ int main(int argc, char *argv[])
     printf("Closing UDP Socket Connection...\n");
     close(sockfd);
     memset(&cliaddr, 0, sizeof(cliaddr));
+    memset(&servaddr, 0, sizeof(servaddr));
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post Probing Phase: Receive Compression Result --------- */
@@ -323,6 +324,10 @@ int main(int argc, char *argv[])
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
+
+    servaddr.sin_family = AF_INET;
+    servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
+    servaddr.sin_port = htons(config->tcp_post_probing_port);
 
     // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)

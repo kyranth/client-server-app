@@ -238,7 +238,7 @@ int main()
 
     UDP_Packet packet;
     int n;
-    int num_packets = config->num_udp_packets;
+    int num_packets = 100;
 
     // Receive low entropy data
     gettimeofday(&first, NULL); // Record first packet arrival time
@@ -306,7 +306,9 @@ int main()
     /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
 
     sockfd = init_tcp();
+    cliaddr.sin_port = htons(config->tcp_post_probing_port);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
+    printf("IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     if (connect(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {
@@ -316,12 +318,12 @@ int main()
     if ((high.tv_sec - low.tv_sec) > config->inter_measurement_time)
     {
         char compression[] = {"Compression detected!"};
-        send(connfd, compression, strlen(compression), 0);
+        send(sockfd, compression, strlen(compression), 0);
     }
     else
     {
         char no_compression[] = {"No Compression detected!"};
-        send(connfd, no_compression, strlen(no_compression), 0);
+        send(sockfd, no_compression, strlen(no_compression), 0);
     }
     printf("Result Sent!\n");
 

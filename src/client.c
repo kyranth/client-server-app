@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
     {
         p_error("setsockopt failed\n");
     }
-    printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
+    printf("IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     // Connect to server
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
@@ -224,7 +224,7 @@ int main(int argc, char *argv[])
     }
     /** --------- End of Socket setup --------- */
     /** --------- Pre-Probing Phase: Send config file --------- */
-    printf("Sending Config file...\n");
+    printf("Pre-Probing Phase: Sending Config file...\n");
     int send = send_ConfigFile(sockfd);
     if (send < 0)
     {
@@ -241,7 +241,7 @@ int main(int argc, char *argv[])
     /** --------- Probing Phase: Sending low and high entropy train --------- */
 
     // Initiate UDP Connection
-    printf("Initiating UDP Connection...\n");
+    printf("Probing Phase: Initiating UDP Connection...\n");
     sockfd = init_udp();
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
@@ -249,8 +249,7 @@ int main(int argc, char *argv[])
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->udp_destination_port);
-
-    printf("Server IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
+    printf("IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {
@@ -259,7 +258,7 @@ int main(int argc, char *argv[])
 
     // Send low entropy data packet
     printf("Sending Low Entropy Packet Train...\n");
-    int num_packets = config->num_udp_packets;
+    int num_packets = 100;
     UDP_Packet packet[num_packets];
     for (int i = 0; i < num_packets; i++)
     {
@@ -293,7 +292,7 @@ int main(int argc, char *argv[])
     fclose(random);
 
     // Send high entropy data packet
-    printf("Sending High Entropy.Packet Train...\n");
+    printf("Sending High Entropy Packet Train...\n");
     for (int i = 0; i < num_packets; i++)
     {
         // Prepare packet payload with packet ID
@@ -313,6 +312,7 @@ int main(int argc, char *argv[])
 
     printf("Closing UDP Socket Connection...\n");
     close(sockfd);
+    memset(&cliaddr, 0, sizeof(cliaddr));
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post Probing Phase: Receive Compression Result --------- */
@@ -320,7 +320,9 @@ int main(int argc, char *argv[])
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
     int connfd;
-    servaddr.sin_port = htons(config->tcp_post_probing_port);
+    cliaddr.sin_family = AF_INET;
+    cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+    cliaddr.sin_port = htons(config->tcp_post_probing_port);
 
     // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)

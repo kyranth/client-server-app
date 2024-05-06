@@ -284,7 +284,7 @@ int main()
             break;
         }
 
-        // printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
+        printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
         // printf("Payload: ");
         // for (int j = 0; j < sizeof(packet.payload); j++)
         // {
@@ -308,7 +308,7 @@ int main()
     sockfd = init_tcp();
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
-    printf("IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
+    printf("IP/Port: %s/%d\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
 
     if (connect(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {

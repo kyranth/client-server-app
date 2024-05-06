@@ -313,15 +313,15 @@ int main()
         p_error("TCP Connection Failed\n");
     }
 
-    char result[] = {"Compression detected!", "No Compression detected!"};
-
     if ((high.tv_sec - low.tv_sec) > config->inter_measurement_time)
     {
-        send(connfd, result[0], strlen(result[0]), 0);
+        char compression[] = {"Compression detected!"};
+        send(connfd, compression, strlen(compression), 0);
     }
     else
     {
-        send(connfd, result[1], strlen(result[1]), 0);
+        char no_compression[] = {"No Compression detected!"};
+        send(connfd, no_compression, strlen(no_compression), 0);
     }
     printf("Result Sent!\n");
 

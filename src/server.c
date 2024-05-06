@@ -281,12 +281,12 @@ int main()
         }
 
         printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
-        printf("Payload: ");
-        for (int j = 0; j < sizeof(packet.payload); j++)
-        {
-            printf("%d", packet.payload[j]);
-        }
-        printf("\n\n");
+        // printf("Payload: ");
+        // for (int j = 0; j < sizeof(packet.payload); j++)
+        // {
+        //     printf("%d", packet.payload[j]);
+        // }
+        // printf("\n\n");
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
     high.tv_sec = last.tv_sec - first.tv_sec;

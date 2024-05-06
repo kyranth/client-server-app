@@ -231,11 +231,13 @@ int main()
     }
 
     /** Probing Phase: Receive packet trains */
+    struct timeval low, high;
     struct timeval first, last; // time variables
     int n;
     UDP_Packet packet;
-    gettimeofday(&first, NULL);
     int num_packets = config->num_udp_packets;
+
+    gettimeofday(&first, NULL); // Record first packet arrival time
     for (int i = 0; i < num_packets - 1; ++i)
     {
         if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
@@ -250,28 +252,47 @@ int main()
         }
 
         printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
-        // printf("Payload: ");
-        // for (int j = 0; j < sizeof(packet.payload); j++)
-        // {
-        //     printf("%d", packet.payload[j]);
-        // }
-        // printf("\n\n");
+        printf("Payload: ");
+        for (int j = 0; j < sizeof(packet.payload); j++)
+        {
+            printf("%d", packet.payload[j]);
+        }
+        printf("\n\n");
     }
-    gettimeofday(&last, NULL);
+    gettimeofday(&last, NULL); // Record the last packet arrival time
 
-    // Receiving second UDP packet
-    // int n = recvfrom(sockfd, (char *)buffer, BUFFER_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len);
-    // buffer[n] = '\0';
-    // gettimeofday(&t2, NULL); // Record arrival time of second packet
-    // printf("Second packet received: %s\n", buffer);
+    low.tv_usec = last.tv_usec - first.tv_usec;
+    printf("Elapsed time: %ld\n", low.tv_usec);
+    memset(&packet, 0, sizeof(packet)); // reset packets
+
+    // Receive high entropy data
+    gettimeofday(&first, NULL); // Record first packet arrival time
+    for (int i = 0; i < num_packets - 1; ++i)
+    {
+        if ((n = recvfrom(sockfd, &packet, PAYLOAD_SIZE, MSG_WAITALL, (struct sockaddr *)&cliaddr, &len)) < 0)
+        {
+            printf("Encountered an error\n");
+            break;
+        }
+        else if (n == 0)
+        {
+            printf("Client closed connection\n");
+            break;
+        }
+
+        printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
+        printf("Payload: ");
+        for (int j = 0; j < sizeof(packet.payload); j++)
+        {
+            printf("%d", packet.payload[j]);
+        }
+        printf("\n\n");
+    }
+    gettimeofday(&last, NULL); // Record the last packet arrival time
+    high.tv_sec = last.tv_sec - first.tv_sec;
+    printf("Delta High: %ld\n", high.tv_sec);
 
     /** Post-Probing Phase: Check for compression and Send findings */
-    // double low_entropy_time, high_entropy_time;
-
-    long microseconds = last.tv_usec - first.tv_usec;
-    // high_entropy_time = (end_time_high.tv_sec - start_time_high.tv_sec) * 1000.0 + (end_time_high.tv_usec - start_time_high.tv_usec) / 1000.0;
-
-    printf("Elapsed time: %ld\n", microseconds);
     // char result[25];
     // if ((high_entropy_time - low_entropy_time) > THRESHOLD) // TODO: check for miliseconds or seconds
     // {

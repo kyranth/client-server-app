@@ -231,7 +231,9 @@ int main(int argc, char *argv[])
     {
         p_error("Couldn't send config file\n");
     }
-    close(sockfd); // TCP Connection
+
+    // TCP Connection
+    close(sockfd);
     memset(&servaddr, 0, sizeof(servaddr));
     memset(&cliaddr, 0, sizeof(cliaddr));
     printf("TCP Closed. Initiating UDP...\n");
@@ -252,36 +254,56 @@ int main(int argc, char *argv[])
         p_error("ERROR: Bind failed\n");
     }
 
-    // [3] Generate low entropy data (all 0s)
+    // [3] Send low entropy data packet
     int num_packets = config->num_udp_packets;
     UDP_Packet packet[num_packets];
 
-    // Send low entropy data packet
+    /*
     for (int i = 0; i < num_packets; i++)
     {
         // Prepare packet payload with packet ID
         packet[i].packet_id = htons(i);
+
+        // Generate low entropy payload data (all 0s)
         memset(packet[i].payload, 0, sizeof(packet[i].payload));
+
+        // Send
+        sendto(sockfd, &packet[i], PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+        // printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
+
+        // Prevent sending packets too fast
+        usleep(50000); // 50 Millisec
+    }
+
+    // [7] Wait before sending high entropy data
+    sleep(INTER_MEASUREMENT_TIME);
+    */
+
+    // Read random file
+    memset(&packet, 0, sizeof(packet));
+
+    // Get generated high entropy data (random numbers) from file
+    char rand_data[PACKET_SIZE];
+    FILE *random = fopen("random_file", "r");
+    fread(rand_data, 1, sizeof(rand_data), random);
+    fclose(random);
+
+    // [8] Send high entropy data packet
+    for (int i = 0; i < num_packets; i++)
+    {
+        // Prepare packet payload with packet ID
+        packet[i].packet_id = htons(i);
+
+        // Copy high entropy data to payload
+        memcpy(packet[i].payload, rand_data, sizeof(packet[i].payload));
 
         // Send
         sendto(sockfd, &packet[i], PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
         printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
 
         // Prevent sending packets too fast
-        usleep(50000); // 100 Millisec
+        usleep(50000); // 50 Millisec
     }
-
-    // [7] Wait before sending high entropy data
-    // sleep(INTER_MEASUREMENT_TIME);
-
-    // [8] Send high entropy data packet
-    // Generate high entropy data (random numbers), rand to a file
-    // srand(time(NULL));
-    // char high_entropy_data[PACKET_SIZE - sizeof(uint16_t)];
-    // for (int i = 0; i < sizeof(high_entropy_data); ++i)
-    // {
-    //     high_entropy_data[i] = rand() % 256;
-    // }
 
     /** Post Probing Phase: Calculate compression; done on Server */
     close(sockfd);

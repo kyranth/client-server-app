@@ -215,7 +215,7 @@ int main(int argc, char *argv[])
     // Connect to server
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
-        p_error("TCP Connection Failed\n");
+        p_error("ERROR: TCP Connection Failed\n");
     }
     /** --------- End of Socket setup --------- */
     /** --------- Pre-Probing Phase: Send config file --------- */
@@ -223,7 +223,7 @@ int main(int argc, char *argv[])
     int send = send_ConfigFile(sockfd);
     if (send < 0)
     {
-        p_error("Couldn't send config file\n");
+        p_error("ERROR: Couldn't send config file\n");
     }
 
     // Release and reset TCP Connection
@@ -235,7 +235,7 @@ int main(int argc, char *argv[])
     /** --------- End of Pre-Probing Phase --------- */
     /** --------- Probing Phase: Sending low and high entropy train --------- */
 
-    // Initiate UDP Connection
+    // [1] Low Entropy - Initiate UDP Connection
     sockfd = init_udp();
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
@@ -251,25 +251,25 @@ int main(int argc, char *argv[])
     }
 
     int num_packets = 100;
-    ssize_t payload_size = (ssize_t)config->udp_payload_size;
+    size_t payload_size = (size_t)(config->udp_payload_size - sizeof(uint16_t));
 
-    UDP_Packet packet[num_packets];
-    packet->payload = malloc(payload_size - sizeof(uint16_t));
+    UDP_Packet *low_packet = (UDP_Packet *)malloc(sizeof(UDP_Packet) * num_packets);
 
     // Send low entropy data packet
     printf("Sending Low Entropy Packet Train...\n");
     for (int i = 0; i < num_packets; ++i)
     {
         // Prepare packet payload with packet ID
-        packet[i].packet_id = htons(i);
+        low_packet[i].packet_id = htons(i);
+        low_packet[i].payload = malloc(payload_size);
 
         // Generate low entropy payload data (all 0s)
-        memset(packet[i].payload, 0, payload_size);
+        memset(low_packet[i].payload, 0, payload_size);
 
         // Send
-        sendto(sockfd, &packet[i], payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+        sendto(sockfd, &low_packet[i], payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
-        memset(&packet, 0, sizeof(packet));
+        memset(&low_packet, 0, sizeof(low_packet));
 
         // Wait to prevent sending packets too fast
         usleep(200);
@@ -281,29 +281,33 @@ int main(int argc, char *argv[])
     printf("Waiting for inter-measurement time...\n");
     sleep(config->inter_measurement_time);
 
+    // [2] High Entropy - Initiate UDP Connection
     sockfd = init_udp();
     // Get generated high entropy data (random numbers) from file
-    char rand_data[payload_size];
+    char rand_data[1000]; // TODO: what size is this
     FILE *random = fopen("random_file", "r");
 
     // Read and close random file
     fread(rand_data, 1, sizeof(rand_data), random);
     fclose(random);
 
+    UDP_Packet *high_packet = (UDP_Packet *)malloc(sizeof(UDP_Packet) * num_packets);
+
     // Send high entropy data packet
     printf("Sending High Entropy Packet Train...\n");
     for (int i = 0; i < num_packets; ++i)
     {
         // Prepare packet payload with packet ID
-        packet[i].packet_id = htons(i);
+        high_packet[i].packet_id = htons(i);
+        high_packet[i].payload = malloc(payload_size);
 
         // Copy high entropy data to payload
-        memcpy(packet[i].payload, rand_data, payload_size);
+        memcpy(high_packet[i].payload, rand_data, payload_size); // TODO: what rate should this filled in
 
         // Send Packet
-        sendto(sockfd, &packet[i], payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+        sendto(sockfd, &high_packet[i], payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
-        memset(&packet, 0, sizeof(packet));
+        memset(&high_packet, 0, sizeof(high_packet));
 
         // Wait to prevent sending packets too fast
         usleep(200);

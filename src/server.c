@@ -93,7 +93,7 @@ int getConfigFile(int connfd, const char *config_file)
 
     // Hold incoming data
     ssize_t buffer_size = 1024;
-    char buffer[1014];
+    char buffer[1024];
     ssize_t bytes_received;
     while ((bytes_received = recv(connfd, buffer, buffer_size, 0)) > 0)
     {
@@ -267,7 +267,7 @@ int main(int argc, char *argv[])
     struct timeval first, last;
 
     UDP_Packet *packet = malloc(sizeof(UDP_Packet));
-    ssize_t payload_size = (ssize_t)config->udp_payload_size;
+    size_t payload_size = (size_t)config->udp_payload_size;
     packet->payload = malloc(payload_size - sizeof(uint16_t));
 
     int num_packets = 100;

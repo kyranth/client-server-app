@@ -237,6 +237,7 @@ int main()
     UDP_Packet packet;
     int num_packets = config->num_udp_packets;
 
+    // Receive low entropy data
     gettimeofday(&first, NULL); // Record first packet arrival time
     for (int i = 0; i < num_packets - 1; ++i)
     {
@@ -252,17 +253,16 @@ int main()
         }
 
         printf("Received packet with ID: %d\n", ntohs(packet.packet_id));
-        printf("Payload: ");
-        for (int j = 0; j < sizeof(packet.payload); j++)
-        {
-            printf("%d", packet.payload[j]);
-        }
-        printf("\n\n");
+        // printf("Payload: ");
+        // for (int j = 0; j < sizeof(packet.payload); j++)
+        // {
+        //     printf("%d", packet.payload[j]);
+        // }
+        // printf("\n\n");
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
 
     low.tv_usec = last.tv_usec - first.tv_usec;
-    printf("Elapsed time: %ld\n", low.tv_usec);
     memset(&packet, 0, sizeof(packet)); // reset packets
 
     // Receive high entropy data
@@ -290,6 +290,8 @@ int main()
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
     high.tv_sec = last.tv_sec - first.tv_sec;
+
+    printf("Elapsed time: %ld\n", low.tv_usec);
     printf("Delta High: %ld\n", high.tv_sec);
 
     /** Post-Probing Phase: Check for compression and Send findings */
@@ -304,7 +306,6 @@ int main()
     // strcpy(result, "No Compression detected!");
     //     send(connfd, result, strlen(result), 0);
     // }
-    //
 
     /** Close TCP connection */
     close(sockfd);

@@ -9,11 +9,6 @@
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-// #include <time.h>
-
-#define BUFFER_SIZE 1024
-#define PACKET_SIZE 1000
-#define INTER_MEASUREMENT_TIME 15
 
 // Structure definition
 typedef struct
@@ -31,10 +26,11 @@ typedef struct
     int udp_packet_ttl;
 } Config;
 
+// UDP packet structure
 typedef struct
 {
     uint16_t packet_id;
-    char payload[PACKET_SIZE - sizeof(uint16_t)];
+    char *payload;
 } UDP_Packet;
 
 Config *createConfig()
@@ -166,23 +162,30 @@ int send_ConfigFile(int sockfd)
         return -1;
     }
 
+    ssize_t buffer_size = 1024;
     ssize_t bytes = 0;
-    char buffer[BUFFER_SIZE] = {0};
-    while (fgets(buffer, BUFFER_SIZE, config_file) != NULL)
+    char buffer[1024] = {0};
+    while (fgets(buffer, buffer_size, config_file) != NULL)
     {
-        bytes = send(sockfd, buffer, BUFFER_SIZE, 0);
+        bytes = send(sockfd, buffer, buffer_size, 0);
         if (bytes < 0)
         {
             printf("ERROR: Couldn't send file\n");
             return -1;
         }
-        memset(buffer, 0, BUFFER_SIZE); // reset buffer
+        memset(buffer, 0, buffer_size); // reset buffer
     }
     // Close file
     fclose(config_file);
     return 0;
 }
 
+/**
+ * @brief Main function responsible for the client application.
+ *
+ * @param argc
+ * @param argv
+ */
 int main(int argc, char *argv[])
 {
     /** Check for command line arguments */
@@ -209,14 +212,6 @@ int main(int argc, char *argv[])
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_pre_probing_port);
 
-    // Enable Don't Fragment flag
-    int enable = 1;
-    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
-    {
-        p_error("setsockopt failed\n");
-    }
-    printf("IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
-
     // Connect to server
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
@@ -224,7 +219,7 @@ int main(int argc, char *argv[])
     }
     /** --------- End of Socket setup --------- */
     /** --------- Pre-Probing Phase: Send config file --------- */
-    printf("Pre-Probing Phase: Sending Config file...\n");
+    printf("Pre-Probing Phase: Sending Config file to (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
     int send = send_ConfigFile(sockfd);
     if (send < 0)
     {
@@ -241,7 +236,6 @@ int main(int argc, char *argv[])
     /** --------- Probing Phase: Sending low and high entropy train --------- */
 
     // Initiate UDP Connection
-    printf("Probing Phase: Initiating UDP Connection...\n");
     sockfd = init_udp();
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
@@ -249,42 +243,47 @@ int main(int argc, char *argv[])
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->udp_destination_port);
-    printf("IP/Port: %s/%d\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
+    printf("Probing Phase: Initiating UDP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
     if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {
         p_error("ERROR: Bind failed\n");
     }
 
+    int num_packets = 100;
+    ssize_t payload_size = (ssize_t)config->udp_payload_size;
+
+    UDP_Packet packet[num_packets];
+    packet->payload = malloc(payload_size - sizeof(uint16_t));
+
     // Send low entropy data packet
     printf("Sending Low Entropy Packet Train...\n");
-    int num_packets = 100;
-    UDP_Packet packet[num_packets];
-    for (int i = 0; i < num_packets; i++)
+    for (int i = 0; i < num_packets; ++i)
     {
         // Prepare packet payload with packet ID
         packet[i].packet_id = htons(i);
 
         // Generate low entropy payload data (all 0s)
-        memset(packet[i].payload, 0, sizeof(packet[i].payload));
+        memset(packet[i].payload, 0, payload_size);
 
         // Send
-        sendto(sockfd, &packet[i], PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
-        // printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
+        sendto(sockfd, &packet[i], payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
-        // Wait 50 Millisec to prevent sending packets too fast
-        usleep(50000);
+        memset(&packet, 0, sizeof(packet));
+
+        // Wait to prevent sending packets too fast
+        usleep(200);
     }
-    printf("Low Entropy Packet Train Sent!\n");
+    printf("Low entropy packet train sent!\n");
+    close(sockfd);
 
     // Wait before sending high entropy data
     printf("Waiting for inter-measurement time...\n");
-    sleep(15);
+    sleep(config->inter_measurement_time);
 
-    memset(&packet, 0, sizeof(packet)); /* Reset packet data from previous packet train */
-
+    sockfd = init_udp();
     // Get generated high entropy data (random numbers) from file
-    char rand_data[PACKET_SIZE];
+    char rand_data[payload_size];
     FILE *random = fopen("random_file", "r");
 
     // Read and close random file
@@ -293,24 +292,24 @@ int main(int argc, char *argv[])
 
     // Send high entropy data packet
     printf("Sending High Entropy Packet Train...\n");
-    for (int i = 0; i < num_packets; i++)
+    for (int i = 0; i < num_packets; ++i)
     {
         // Prepare packet payload with packet ID
         packet[i].packet_id = htons(i);
 
         // Copy high entropy data to payload
-        memcpy(packet[i].payload, rand_data, sizeof(packet[i].payload));
+        memcpy(packet[i].payload, rand_data, payload_size);
 
         // Send Packet
-        sendto(sockfd, &packet[i], PACKET_SIZE, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
-        // printf("Sent packet with ID: %d\n", ntohs(packet[i].packet_id));
+        sendto(sockfd, &packet[i], payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
-        // Wait 50 Millisec to prevent sending packets too fast
-        usleep(50000);
+        memset(&packet, 0, sizeof(packet));
+
+        // Wait to prevent sending packets too fast
+        usleep(200);
     }
-    printf("High Entropy Packet Train sent!\n");
+    printf("High entropy packet train sent. UDP Socket Connection Closed!\n");
 
-    printf("Closing UDP Socket Connection...\n");
     close(sockfd);
     memset(&cliaddr, 0, sizeof(cliaddr));
     memset(&servaddr, 0, sizeof(servaddr));
@@ -320,7 +319,6 @@ int main(int argc, char *argv[])
 
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
-    int connfd;
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
@@ -328,37 +326,27 @@ int main(int argc, char *argv[])
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
+    printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
-    // Bind TCP socket
-    if (bind(sockfd, (const struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    if (connect(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {
-        p_error("ERROR: Bind failed\n");
+        p_error("TCP Connection Failed\n");
     }
 
-    // Listen for connections
-    if (listen(sockfd, 5) < 0)
-    {
-        p_error("ERROR: Listen failed\n");
-    }
-
-    // Accept incoming connection
-    socklen_t len = sizeof(servaddr);
-    if ((connfd = accept(sockfd, (struct sockaddr *)&servaddr, &len)) < 0)
-    {
-        p_error("ERROR: Accept failed\n");
-    }
-
-    char buffer[BUFFER_SIZE];
+    // Variables for receive
+    char buffer[25];
     ssize_t bytes_received;
-    while ((bytes_received = recv(connfd, buffer, BUFFER_SIZE, 0)) > 0)
+
+    printf("Waiting for result from (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
+    while ((bytes_received = recv(sockfd, buffer, sizeof(buffer), 0)) > 0)
     {
         printf("%s\n", buffer);
-        memset(buffer, 0, BUFFER_SIZE);
+        memset(buffer, 0, sizeof(buffer));
     }
 
     close(sockfd);
     free(config);
 
-    printf("Connection closed\n");
+    printf("Client Concluded!\n");
     return 0;
 }

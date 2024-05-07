@@ -246,6 +246,14 @@ int main(int argc, char *argv[])
 
     /** --------- End of Pre-Probing Phase --------- */
     /** --------- Probing Phase: Receive Low Entropy Packet Train --------- */
+    // Set timeout in seconds
+    struct timeval timeout;
+    timeout.tv_sec = 15;
+    timeout.tv_usec = 0;
+    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
+    {
+        p_error("setsockopt (receive timeout) failed");
+    }
 
     struct timeval low, high;
     struct timeval first, last;

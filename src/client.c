@@ -223,6 +223,8 @@ int main(int argc, char *argv[])
 
     // Release and reset TCP Connection
     close(sockfd);
+    memset(&servaddr, 0, sizeof(servaddr));
+    memset(&cliaddr, 0, sizeof(cliaddr));
     printf("Config file sent and TCP Connection released!\n");
 
     /** --------- End of Pre-Probing Phase --------- */
@@ -233,6 +235,7 @@ int main(int argc, char *argv[])
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
 
+    servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->udp_destination_port);
     printf("Probing Phase: Initiating UDP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
@@ -314,13 +317,19 @@ int main(int argc, char *argv[])
     }
     printf("High entropy packet train sent. UDP Socket Connection Closed!\n");
     close(sockfd);
+    memset(&cliaddr, 0, sizeof(cliaddr));
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post Probing Phase: Receive Compression Result --------- */
 
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
+
+    int connfd;
+    cliaddr.sin_family = AF_INET;
+    cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
+
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 

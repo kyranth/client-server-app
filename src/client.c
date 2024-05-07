@@ -221,8 +221,6 @@ int main(int argc, char *argv[])
 
     // Release and reset TCP Connection
     close(sockfd);
-    memset(&servaddr, 0, sizeof(servaddr));
-    memset(&cliaddr, 0, sizeof(cliaddr));
     printf("Config file sent and TCP Connection released!\n");
 
     /** --------- End of Pre-Probing Phase --------- */
@@ -233,21 +231,20 @@ int main(int argc, char *argv[])
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
 
-    servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->udp_destination_port);
     printf("Probing Phase: Initiating UDP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
-
-    if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
-    {
-        p_error("ERROR: Bind failed\n");
-    }
 
     // Enable Don't Fragment flag
     int enable = 1;
     if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
     {
         p_error("setsockopt failed\n");
+    }
+
+    if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    {
+        p_error("ERROR: Bind failed\n");
     }
 
     int num_packets = config->num_udp_packets;
@@ -257,7 +254,7 @@ int main(int argc, char *argv[])
     typedef struct
     {
         unsigned short packet_id;
-        char payload[payload_size - 2];
+        char payload[payload_size];
     } UDP_Packet;
 
     UDP_Packet low_packet;
@@ -287,9 +284,8 @@ int main(int argc, char *argv[])
     sleep(config->inter_measurement_time);
 
     // [2] High Entropy - Initiate UDP Connection
-    sockfd = init_udp();
     // Get generated high entropy data (random numbers) from file
-    char rand_data[payload_size - 2];
+    char rand_data[payload_size];
     FILE *random = fopen("random_file", "r");
 
     // Read and close random file
@@ -324,7 +320,6 @@ int main(int argc, char *argv[])
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
-
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 

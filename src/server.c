@@ -249,37 +249,35 @@ int main(int argc, char *argv[])
 
     // Set timeout in seconds
     struct timeval timeout;
-    timeout.tv_sec = 10;
+    timeout.tv_sec = 15;
     timeout.tv_usec = 0;
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {
         p_error("setsockopt (receive timeout) failed");
     }
 
-    // Enable Don't Fragment flag
-    int enable = 1;
-    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
-    {
-        p_error("setsockopt failed\n");
-    }
-
     struct timeval low, high;
     struct timeval first, last;
 
-    UDP_Packet *packet = malloc(sizeof(UDP_Packet));
-    size_t payload_size = (size_t)config->udp_payload_size;
-    packet->payload = malloc(payload_size - sizeof(uint16_t));
+    size_t payload_size = (size_t)(config->udp_payload_size - sizeof(uint16_t));
+    int num_packets = config->num_udp_packets;
 
-    int num_packets = 100;
-    ssize_t bytes_received;
-
-    printf("Incoming Low Entropy Packet Train: (%s/%d)\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
-    gettimeofday(&first, NULL); // Record first packet arrival time
-
-    // Receive low entropy data
-    for (int i = 0; i < num_packets - 1; ++i)
+    // UDP packet structure
+    typedef struct
     {
-        if ((bytes_received = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
+        unsigned short packet_id;
+        char payload[payload_size - 2];
+    } UDP_Packet;
+
+    UDP_Packet low_packet;
+
+    printf("Listening for low entropy packets...\n");
+    gettimeofday(&first, NULL); // Record first packet arrival time
+    // Receive low entropy data
+    ssize_t bytes_received;
+    for (int i = 0; i < num_packets; ++i)
+    {
+        if ((bytes_received = recvfrom(sockfd, &low_packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
             printf("ERROR: Couldn't receive packet!\n");
             break;
@@ -289,35 +287,18 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-        printf("Low Entropy : %d packets received!\r", ntohs(packet->packet_id));
-        fflush(stdout);
-        memset(&packet, 0, sizeof(packet)); // reset packets
+        printf("Low Entropy : %d packets received!\n", low_packet.packet_id);
+        memset(&low_packet, 0, sizeof(low_packet)); // reset packets
     }
 
-    printf("\n");
-    close(sockfd);
     gettimeofday(&last, NULL); // Record the last packet arrival time
-
     low.tv_sec = last.tv_sec - first.tv_sec;
 
     // Receive high entropy data
-    sockfd = init_udp();
-
-    // Set timeout
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (const char *)&timeout, sizeof(timeout)) < 0)
-    {
-        p_error("ERROR: Receive timeout) failed");
-    }
-
-    // Enable Don't Fragment flag
-    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
-    {
-        p_error("ERROR: Don't fragment failed\n");
-    }
-
-    // Receive high entropy data
+    UDP_Packet packet;
+    printf("Listening for high entropy packets...\n");
     gettimeofday(&first, NULL); // Record first packet arrival time
-    for (int i = 0; i < num_packets - 1; ++i)
+    for (int i = 0; i < num_packets; ++i)
     {
         if ((bytes_received = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
@@ -329,23 +310,16 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-
-        printf("Low Entropy : %d packets received!\r", ntohs(packet->packet_id));
-        fflush(stdout);
+        printf("High Entropy : %d packets received!\n", packet.packet_id);
         memset(&packet, 0, sizeof(packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
-
-    printf("High entropy packets received!\n");
     high.tv_sec = last.tv_sec - first.tv_sec;
 
     close(sockfd);
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
-    printf("Delta Low: %ld\n", low.tv_sec);
-    printf("Delta High: %ld\n", high.tv_sec);
-    printf("D_High - D_Low: %ld\n", high.tv_sec - low.tv_sec);
 
     sockfd = init_tcp();
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
@@ -370,6 +344,10 @@ int main(int argc, char *argv[])
     {
         p_error("ERROR: Accept failed\n");
     }
+
+    printf("Delta Low Entropy: %ld\n", low.tv_sec);
+    printf("Delta High Entropy: %ld\n", high.tv_sec);
+    printf("D_High - D_Low: %ld\n", high.tv_sec - low.tv_sec);
 
     if ((high.tv_sec - low.tv_sec) > config->inter_measurement_time)
     {

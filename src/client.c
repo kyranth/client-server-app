@@ -205,6 +205,13 @@ int main(int argc, char *argv[])
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_pre_probing_port);
 
+    // Enable Don't Fragment flag
+    int enable = 1;
+    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
+    {
+        p_error("ERROR: Don't Fragment failed\n");
+    }
+
     // Connect to server
     if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
@@ -223,7 +230,6 @@ int main(int argc, char *argv[])
 
     // Release and reset TCP Connection
     close(sockfd);
-    memset(&servaddr, 0, sizeof(servaddr));
     memset(&cliaddr, 0, sizeof(cliaddr));
     printf("Config file sent and TCP Connection released!\n");
 
@@ -235,7 +241,6 @@ int main(int argc, char *argv[])
     cliaddr.sin_family = AF_INET;
     cliaddr.sin_port = htons(config->udp_source_port);
 
-    servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->udp_destination_port);
     printf("Probing Phase: Initiating UDP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
@@ -244,13 +249,6 @@ int main(int argc, char *argv[])
     if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {
         p_error("ERROR: Bind failed\n");
-    }
-
-    // Enable Don't Fragment flag
-    int enable = 1;
-    if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
-    {
-        p_error("ERROR: Don't Fragment failed\n");
     }
 
     int num_packets = config->num_udp_packets;

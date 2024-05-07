@@ -280,7 +280,6 @@ int main(int argc, char *argv[])
         usleep(200);
     }
     printf("Low entropy packet train sent!\n");
-    close(sockfd);
 
     // Wait before sending high entropy data
     printf("Waiting for inter-measurement time...\n");

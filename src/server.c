@@ -248,7 +248,7 @@ int main(int argc, char *argv[])
     /** --------- Probing Phase: Receive Low Entropy Packet Train --------- */
     // Set timeout in seconds
     struct timeval timeout;
-    timeout.tv_sec = 15;
+    timeout.tv_sec = 10;
     timeout.tv_usec = 0;
     if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
     {
@@ -313,9 +313,8 @@ int main(int argc, char *argv[])
         memset(&high_packet, 0, sizeof(high_packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
-    high.tv_sec = last.tv_sec - first.tv_sec;
-
     close(sockfd);
+    high.tv_sec = last.tv_sec - first.tv_sec;
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post-Probing Phase: Check for compression and Send findings --------- */

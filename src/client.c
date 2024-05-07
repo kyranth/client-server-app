@@ -239,9 +239,10 @@ int main(int argc, char *argv[])
     int enable = 1;
     if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
     {
-        p_error("setsockopt failed\n");
+        p_error("ERROR: Don't Fragment failed\n");
     }
 
+    // UDP Bind
     if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
     {
         p_error("ERROR: Bind failed\n");
@@ -310,7 +311,6 @@ int main(int argc, char *argv[])
         usleep(200);
     }
     printf("High entropy packet train sent. UDP Socket Connection Closed!\n");
-
     close(sockfd);
 
     /** --------- End of Probing Phase --------- */

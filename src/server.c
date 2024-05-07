@@ -290,17 +290,17 @@ int main(int argc, char *argv[])
         printf("Low Entropy : %d packets received!\n", low_packet.packet_id);
         memset(&low_packet, 0, sizeof(low_packet)); // reset packets
     }
-
     gettimeofday(&last, NULL); // Record the last packet arrival time
+
     low.tv_sec = last.tv_sec - first.tv_sec;
 
     // [2] Receive high entropy data
-    UDP_Packet packet;
+    UDP_Packet high_packet;
     printf("Listening for high entropy packets...\n");
     gettimeofday(&first, NULL); // Record first packet arrival time
     for (int i = 0; i < num_packets; ++i)
     {
-        if ((bytes_received = recvfrom(sockfd, &packet, sizeof(packet.payload), 0, (struct sockaddr *)&cliaddr, &len)) < 0)
+        if ((bytes_received = recvfrom(sockfd, &high_packet, sizeof(high_packet.payload), 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
             printf("ERROR: Couldn't receive packet!\n");
             break;
@@ -310,8 +310,8 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-        printf("High Entropy : %d packets received!\n", packet.packet_id);
-        memset(&packet, 0, sizeof(packet)); // reset packets
+        printf("High Entropy : %d packets received!\n", high_packet.packet_id);
+        memset(&high_packet, 0, sizeof(high_packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
     high.tv_sec = last.tv_sec - first.tv_sec;

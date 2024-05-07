@@ -11,6 +11,99 @@
 #include <netinet/udp.h>
 #include <sys/time.h>
 
+// Structure definition
+typedef struct
+{
+	char *server_ip_address;
+	int udp_source_port;
+	int udp_destination_port;
+	int tcp_head_syn_port;
+	int tcp_tail_syn_port;
+	int tcp_pre_probing_port;
+	int tcp_post_probing_port;
+	int udp_payload_size;
+	int inter_measurement_time;
+	int num_udp_packets;
+	int udp_packet_ttl;
+} Config;
+
+Config *createConfig()
+{
+	Config *config = (Config *)malloc(sizeof(Config));
+	if (config == NULL)
+	{
+		perror("Failed to allocate memory for Config");
+		exit(1);
+	}
+
+	// Assuming IPv4 address, so 15 characters + null terminator
+	config->server_ip_address = malloc(16 * sizeof(char));
+
+	if (config->server_ip_address == NULL)
+	{
+		perror("Failed to allocate memory for server_ip_address");
+		exit(1);
+	}
+
+	return config;
+}
+
+void p_error(const char *msg)
+{
+	perror(msg);
+	exit(1);
+}
+
+/**
+ * @brief Takes a filename and returns the cJSON object
+ *
+ * @param file pointer to a filename
+ * @param config structure
+ */
+void setConfig(const char *file, Config *config)
+{
+	// open the file
+	FILE *fp = fopen(file, "r");
+	if (fp == NULL)
+	{
+		p_error("Could not open config file\n");
+	}
+
+	// read the file contents into a string
+	char buffer[1024];
+	fread(buffer, 1, sizeof(buffer), fp);
+	fclose(fp);
+
+	// parse the JSON data
+	cJSON *json = cJSON_Parse(buffer);
+	if (json == NULL)
+	{
+		const char *error_ptr = cJSON_GetErrorPtr();
+		if (error_ptr != NULL)
+		{
+			printf("Error: %s\n", error_ptr);
+		}
+		exit(1);
+	}
+	else
+	{
+		strcpy(config->server_ip_address, cJSON_GetObjectItemCaseSensitive(json, "server_ip_address")->valuestring);
+		config->udp_source_port = cJSON_GetObjectItemCaseSensitive(json, "udp_source_port")->valueint;
+		config->udp_destination_port = cJSON_GetObjectItemCaseSensitive(json, "udp_destination_port")->valueint;
+		config->tcp_head_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_head_syn_port")->valueint;
+		config->tcp_tail_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_tail_syn_port")->valueint;
+		config->tcp_pre_probing_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_pre_probing_port")->valueint;
+		config->tcp_post_probing_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_post_probing_port")->valueint;
+		config->udp_payload_size = cJSON_GetObjectItemCaseSensitive(json, "udp_payload_size")->valueint;
+		config->inter_measurement_time = cJSON_GetObjectItemCaseSensitive(json, "inter_measurement_time")->valueint;
+		config->num_udp_packets = cJSON_GetObjectItemCaseSensitive(json, "num_udp_packets")->valueint;
+		config->udp_packet_ttl = cJSON_GetObjectItemCaseSensitive(json, "udp_packet_ttl")->valueint;
+	}
+
+	// delete the JSON object
+	cJSON_Delete(json);
+}
+
 /**
  * @brief Takes udphdr pointer and Config file to construct UDP Header
  *

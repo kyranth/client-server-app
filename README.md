@@ -6,10 +6,10 @@ This is a client-server application developed in C programming language. The app
 TCP File Transfer: Initiates a TCP connection with the server and sends the config.json file.
 - Server-Side File Handling: The server receives the file from the client and writes it to the file system. Then it reads the file into memory.
 - UDP Packet Exchange:
-- Low Entropy Packets: The client sends 6000 low entropy (all 0s) UDP packets to the server over a UDP connection.
-- High Entropy Packets: After a delay, the client sends 6000 high entropy packets to the server.
+	- Low Entropy Packets: The client sends *n* low entropy (all 0s) UDP packets to the server over a UDP connection.
+	- High Entropy Packets: After the inter measurement time, the client sends *n* high entropy packets (generated from file) to the server.
 - Packet Time Recording: The server records the time of the first packet and the last packet received for both low and high entropy packets.
-- Delta Calculation: Calculates the time difference between receiving 6000 low entropy packets and 6000 high entropy packets.
+- Delta Calculation: Calculates the time difference between receiving *n* low entropy packets and *n* high entropy packets.
 - Result Transmission: The server sends the calculated delta to the client over a TCP connection.
 
 ## Configuration:
@@ -66,6 +66,10 @@ The `config.json` file should have the following structure:
 Standard C libraries
 Socket programming libraries for TCP and UDP communication
 [cJSON](https://github.com/DaveGamble/cJSON) library for parsing the config file
+
+# Limitations
+- Since the probing phase consists of UDP connections, it may lose a couple of packets.
+- Unfortunately the program can't run the part 2 standalone program due to time limitations, couldn't initiate connections. Although the `standalone.c` program has some implementations for RAW Sockets.
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.

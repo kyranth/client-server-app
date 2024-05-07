@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
     UDP_Packet low_packet;
 
     // Generate low entropy payload data (all 0s)
-    memset(low_packet.payload, 0, sizeof(low_packet.payload));
+    memset(low_packet.payload, 0, payload_size);
 
     // Send low entropy data packet
     printf("Sending Low Entropy Packet Train...\n");
@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
         sendto(sockfd, &low_packet, sizeof(low_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
         // Wait to prevent sending packets too fast
-        usleep(200);
+        usleep(300);
     }
     printf("Low entropy packet train sent!\n");
     close(sockfd);
@@ -300,7 +300,7 @@ int main(int argc, char *argv[])
     UDP_Packet high_packet;
 
     // Copy high entropy data to payload
-    memcpy(high_packet.payload, rand_data, sizeof(high_packet.payload));
+    memcpy(high_packet.payload, rand_data, payload_size);
 
     // Send high entropy data packet
     printf("Sending High Entropy Packet Train...\n");
@@ -313,11 +313,10 @@ int main(int argc, char *argv[])
         sendto(sockfd, &high_packet, sizeof(high_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
         // Wait to prevent sending packets too fast
-        usleep(200);
+        usleep(300);
     }
     printf("High entropy packet train sent. UDP Socket Connection Closed!\n");
     close(sockfd);
-    memset(&cliaddr, 0, sizeof(cliaddr));
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post Probing Phase: Receive Compression Result --------- */
@@ -325,11 +324,7 @@ int main(int argc, char *argv[])
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
 
-    int connfd;
-    cliaddr.sin_family = AF_INET;
-    cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
-
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 

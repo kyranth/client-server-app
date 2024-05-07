@@ -61,6 +61,7 @@ The `config.json` file should have the following structure:
 		```
 		./server 7777
 		```
+3. Docker was used to simply built the project. DO NOT use for testing purposes.
 
 ## Dependencies
 Standard C libraries
@@ -70,6 +71,10 @@ Socket programming libraries for TCP and UDP communication
 # Limitations
 - Since the probing phase consists of UDP connections, it may lose a couple of packets.
 - Unfortunately the program can't run the part 2 standalone program due to time limitations, couldn't initiate connections. Although the `standalone.c` program has some implementations for RAW Sockets.
+- The `lib` directory holds the libraries required for this project. Although, some custom headers file might exist there to spread the project over multiple files, it's not yet implemented due to time limitations.
+
+# Findings 
+The `client-server.pcap` file demonstrates the network compression link from this project over 12,0000 packet frames.
 
 ## License
 This project is licensed under the MIT License - see the LICENSE file for details.

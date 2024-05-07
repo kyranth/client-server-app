@@ -210,8 +210,10 @@ int main(int argc, char *argv[])
     {
         p_error("ERROR: TCP Connection Failed\n");
     }
+
     /** --------- End of Socket setup --------- */
     /** --------- Pre-Probing Phase: Send config file --------- */
+
     printf("Pre-Probing Phase: Sending Config file to (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
     int send = send_ConfigFile(sockfd);
     if (send < 0)
@@ -255,7 +257,7 @@ int main(int argc, char *argv[])
     typedef struct
     {
         unsigned short packet_id;
-        char payload[payload_size];
+        char payload[payload_size - 2];
     } UDP_Packet;
 
     UDP_Packet low_packet;
@@ -271,7 +273,7 @@ int main(int argc, char *argv[])
         low_packet.packet_id = (unsigned short)i;
 
         // Send
-        sendto(sockfd, &low_packet, payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+        sendto(sockfd, &low_packet, sizeof(low_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
         // Wait to prevent sending packets too fast
         usleep(200);
@@ -285,7 +287,7 @@ int main(int argc, char *argv[])
 
     // [2] High Entropy - Initiate UDP Connection
     // Get generated high entropy data (random numbers) from file
-    char rand_data[payload_size];
+    char rand_data[payload_size - 2];
     FILE *random = fopen("random_file", "r");
 
     // Read and close random file
@@ -295,7 +297,7 @@ int main(int argc, char *argv[])
     UDP_Packet high_packet;
 
     // Copy high entropy data to payload
-    memcpy(high_packet.payload, rand_data, payload_size);
+    memcpy(high_packet.payload, rand_data, sizeof(high_packet.payload));
 
     // Send high entropy data packet
     printf("Sending High Entropy Packet Train...\n");

@@ -238,15 +238,6 @@ int main(int argc, char *argv[])
     cliaddr.sin_port = htons(config->udp_source_port);
     servaddr.sin_port = htons(config->udp_destination_port);
 
-    // Bind for UDP socket connection
-    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
-    {
-        p_error("ERROR: Bind Failure\n");
-    }
-
-    /** --------- End of Pre-Probing Phase --------- */
-    /** --------- Probing Phase: Receive Low Entropy Packet Train --------- */
-
     // Set timeout in seconds
     struct timeval timeout;
     timeout.tv_sec = 15;
@@ -255,6 +246,15 @@ int main(int argc, char *argv[])
     {
         p_error("setsockopt (receive timeout) failed");
     }
+
+    // Bind for UDP socket connection
+    if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    {
+        p_error("ERROR: Bind Failure\n");
+    }
+
+    /** --------- End of Pre-Probing Phase --------- */
+    /** --------- Probing Phase: Receive Low Entropy Packet Train --------- */
 
     struct timeval low, high;
     struct timeval first, last;
@@ -266,7 +266,7 @@ int main(int argc, char *argv[])
     typedef struct
     {
         unsigned short packet_id;
-        char payload[payload_size];
+        char payload[payload_size - 2];
     } UDP_Packet;
 
     UDP_Packet low_packet;
@@ -287,7 +287,7 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-        printf("Low Entropy : %d packets received!\n", low_packet.packet_id);
+        // printf("Low Entropy : %d packets received!\n", low_packet.packet_id);
         memset(&low_packet, 0, sizeof(low_packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
@@ -310,7 +310,7 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-        printf("High Entropy : %d packets received!\n", high_packet.packet_id);
+        // printf("High Entropy : %d packets received!\n", high_packet.packet_id);
         memset(&high_packet, 0, sizeof(high_packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time

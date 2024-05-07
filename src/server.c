@@ -319,11 +319,11 @@ int main(int argc, char *argv[])
     /** --------- End of Probing Phase --------- */
     /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
 
-    printf("Post Probing Phase: Initiating TCP Connection (%s/%d)...\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
     sockfd = init_tcp();
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
+    printf("Post Probing Phase: Initiating TCP Connection (%s/%d)...\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
 
     // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
@@ -338,8 +338,8 @@ int main(int argc, char *argv[])
     }
 
     // Accept incoming connection
-    len = sizeof(servaddr);
-    if ((connfd = accept(sockfd, (struct sockaddr *)&servaddr, &len)) < 0)
+    len = sizeof(cliaddr);
+    if ((connfd = accept(sockfd, (struct sockaddr *)&cliaddr, &len)) < 0)
     {
         p_error("ERROR: Accept failed\n");
     }

@@ -263,7 +263,6 @@ int main(int argc, char *argv[])
     memset(low_packet.payload, 0, sizeof(low_packet.payload));
 
     // Send low entropy data packet
-    sleep(2);
     printf("Sending Low Entropy Packet Train...\n");
     for (int i = 0; i < num_packets; ++i)
     {

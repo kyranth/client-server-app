@@ -228,7 +228,6 @@ int main(int argc, char *argv[])
         p_error("ERROR: Didn't receive config file\n");
     }
     close(sockfd);
-    close(connfd);
 
     // Create and setup config variables
     Config *config = createConfig();
@@ -267,18 +266,18 @@ int main(int argc, char *argv[])
     typedef struct
     {
         unsigned short packet_id;
-        char payload[payload_size - 2];
+        char payload[payload_size];
     } UDP_Packet;
 
     UDP_Packet low_packet;
 
     printf("Listening for low entropy packets...\n");
     gettimeofday(&first, NULL); // Record first packet arrival time
-    // Receive low entropy data
+    // [1] Receive low entropy data
     ssize_t bytes_received;
     for (int i = 0; i < num_packets; ++i)
     {
-        if ((bytes_received = recvfrom(sockfd, &low_packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
+        if ((bytes_received = recvfrom(sockfd, &low_packet, sizeof(low_packet.payload), 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
             printf("ERROR: Couldn't receive packet!\n");
             break;
@@ -295,13 +294,13 @@ int main(int argc, char *argv[])
     gettimeofday(&last, NULL); // Record the last packet arrival time
     low.tv_sec = last.tv_sec - first.tv_sec;
 
-    // Receive high entropy data
+    // [2] Receive high entropy data
     UDP_Packet packet;
     printf("Listening for high entropy packets...\n");
     gettimeofday(&first, NULL); // Record first packet arrival time
     for (int i = 0; i < num_packets; ++i)
     {
-        if ((bytes_received = recvfrom(sockfd, &packet, payload_size, 0, (struct sockaddr *)&cliaddr, &len)) < 0)
+        if ((bytes_received = recvfrom(sockfd, &packet, sizeof(packet.payload), 0, (struct sockaddr *)&cliaddr, &len)) < 0)
         {
             printf("ERROR: Couldn't receive packet!\n");
             break;

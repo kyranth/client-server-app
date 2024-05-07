@@ -35,16 +35,20 @@ The `config.json` file should have the following structure:
 ```
 
 ## Usage
-1. Compilation: Compile the client and server source files using a C compiler (e.g., gcc).
-- The make simplifies this process. Simply run the command below.
+1. Setup two different Virtual Machines, one for Client and one Server.
+2. Compilation: Compile the client and server source files using a C compiler (e.g., gcc).
+- The make simplifies this process. Simply run the command below. However, compile each program on respective VMs.
 	```
-	make app
+	make client
 	```
-- This compiles and generates executables for both client and server application. 
+	```
+	make server
+	```
+- This compiles and generates executables for client and server application. 
 
 	**Note:** *the cJSON library is include in the object files and compiles as one executable. Which is required to run the applications.*
 
-2. **Execution** 
+3. **Execution** 
 
 	Both program requires command line arguments
 
@@ -61,7 +65,7 @@ The `config.json` file should have the following structure:
 		```
 		./server 7777
 		```
-3. Docker was used to simply built the project. DO NOT use for testing purposes.
+4. Docker was used to simply built the project. DO NOT use for testing purposes.
 
 ## Dependencies
 Standard C libraries

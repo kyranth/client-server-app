@@ -323,9 +323,9 @@ int main(int argc, char *argv[])
     /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
 
     sockfd = init_tcp();
-    cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
+
     printf("Post Probing Phase: Initiating TCP Connection (%s/%d)...\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));
     // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)

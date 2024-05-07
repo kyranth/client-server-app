@@ -228,6 +228,7 @@ int main(int argc, char *argv[])
         p_error("ERROR: Didn't receive config file\n");
     }
     close(sockfd);
+    close(connfd);
 
     // Create and setup config variables
     Config *config = createConfig();
@@ -287,7 +288,7 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-        // printf("Low Entropy : %d packets received!\n", low_packet.packet_id);
+        printf("Low Entropy : %d packets received!\n", low_packet.packet_id);
         memset(&low_packet, 0, sizeof(low_packet)); // reset packets
     }
 
@@ -310,7 +311,7 @@ int main(int argc, char *argv[])
             printf("Client closed connection\n");
             break;
         }
-        // printf("High Entropy : %d packets received!\n", packet.packet_id);
+        printf("High Entropy : %d packets received!\n", packet.packet_id);
         memset(&packet, 0, sizeof(packet)); // reset packets
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time

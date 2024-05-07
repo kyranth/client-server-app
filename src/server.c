@@ -238,15 +238,6 @@ int main(int argc, char *argv[])
     cliaddr.sin_port = htons(config->udp_source_port);
     servaddr.sin_port = htons(config->udp_destination_port);
 
-    // Set timeout in seconds
-    struct timeval timeout;
-    timeout.tv_sec = 15;
-    timeout.tv_usec = 0;
-    if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
-    {
-        p_error("setsockopt (receive timeout) failed");
-    }
-
     // Bind for UDP socket connection
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {

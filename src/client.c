@@ -240,17 +240,17 @@ int main(int argc, char *argv[])
     servaddr.sin_port = htons(config->udp_destination_port);
     printf("Probing Phase: Initiating UDP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
+    // UDP Bind
+    if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    {
+        p_error("ERROR: Bind failed\n");
+    }
+
     // Enable Don't Fragment flag
     int enable = 1;
     if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
     {
         p_error("ERROR: Don't Fragment failed\n");
-    }
-
-    // UDP Bind
-    if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
-    {
-        p_error("ERROR: Bind failed\n");
     }
 
     int num_packets = config->num_udp_packets;
@@ -279,7 +279,7 @@ int main(int argc, char *argv[])
         sendto(sockfd, &low_packet, sizeof(low_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
         // Wait to prevent sending packets too fast
-        usleep(300);
+        usleep(200);
     }
     printf("Low entropy packet train sent!\n");
     close(sockfd);
@@ -313,7 +313,7 @@ int main(int argc, char *argv[])
         sendto(sockfd, &high_packet, sizeof(high_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
         // Wait to prevent sending packets too fast
-        usleep(300);
+        usleep(200);
     }
     printf("High entropy packet train sent. UDP Socket Connection Closed!\n");
     close(sockfd);

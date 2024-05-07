@@ -1,5 +1,5 @@
 {
-    "server_ip_address": "172.17.0.2",
+    "server_ip_address": "172.16.4.4",
     "udp_source_port": 9876,
     "udp_destination_port": 8765,
     "tcp_head_syn_port": 9999,

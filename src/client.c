@@ -323,6 +323,7 @@ int main(int argc, char *argv[])
     /** --------- End of Probing Phase --------- */
     /** --------- Post Probing Phase: Receive Compression Result --------- */
 
+    sleep(5);
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
     cliaddr.sin_family = AF_INET;

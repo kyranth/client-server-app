@@ -39,6 +39,11 @@ void p_error(const char *msg)
     exit(EXIT_FAILURE);
 }
 
+/**
+ * Creates a TCP file descriptor and returns for use.
+ *
+ * @return sockfd file descriptor
+ */
 int init_tcp()
 {
     int sockfd;
@@ -51,6 +56,11 @@ int init_tcp()
     return sockfd;
 }
 
+/**
+ * Creates a UDP file descriptor and returns for use.
+ *
+ * @return sockfd file descriptor or -1 if unsuccessful
+ */
 int init_udp()
 {
     int sockfd;
@@ -63,6 +73,11 @@ int init_udp()
     return sockfd;
 }
 
+/**
+ * @brief Takes sockfd and sends config file over connection
+ *
+ * @param sockfd socket file descriptor or -1 if unsuccessful
+ */
 Config *createConfig()
 {
     Config *config = malloc(sizeof(Config));
@@ -171,7 +186,7 @@ void setConfig(const char *file, Config *config)
 }
 
 /**
- * @brief Main function responsible for the client application.
+ * @brief Main function responsible for the server application.
  *
  * @param argc
  * @param argv

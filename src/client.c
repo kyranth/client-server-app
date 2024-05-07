@@ -251,6 +251,7 @@ int main(int argc, char *argv[])
         p_error("ERROR: Bind failed\n");
     }
 
+    // variable to hold num packets and payload size from config file
     int num_packets = config->num_udp_packets;
     size_t payload_size = (size_t)(config->udp_payload_size - sizeof(uint16_t));
 
@@ -321,6 +322,7 @@ int main(int argc, char *argv[])
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
 
+    // Set ip addresses and ports
     cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);

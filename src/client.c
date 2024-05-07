@@ -317,20 +317,14 @@ int main(int argc, char *argv[])
     printf("High entropy packet train sent. UDP Socket Connection Closed!\n");
 
     close(sockfd);
-    memset(&cliaddr, 0, sizeof(cliaddr));
-    memset(&servaddr, 0, sizeof(servaddr));
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post Probing Phase: Receive Compression Result --------- */
 
     // Init TCP Connection for receiving result
     sockfd = init_tcp();
-    cliaddr.sin_family = AF_INET;
-    cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
 
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 

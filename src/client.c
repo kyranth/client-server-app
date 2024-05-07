@@ -327,13 +327,13 @@ int main(int argc, char *argv[])
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
-    if (connect(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+    if (connect(sockfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
     {
         p_error("TCP Connection Failed\n");
     }
 
     // Variables for receive
-    char buffer[25];
+    char buffer[25] = {0};
     ssize_t bytes_received;
 
     printf("Waiting for result from (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));

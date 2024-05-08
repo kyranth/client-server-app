@@ -1,13 +1,14 @@
 #define __USE_BSD		/* use bsd'ish ip header */
 #include <sys/socket.h> /* these headers are for a Linux system, but */
 #include <netinet/in.h> /* the names on other systems are easy to guess.. */
-#include <netinet/ip.h>
+#include <linux/ip.h>
 #define __FAVOR_BSD /* use bsd'ish tcp header */
-#include <netinet/tcp.h>
+#include <linux/tcp.h>
 #include <unistd.h>
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "../lib/cJSON.h"
 #include <sys/time.h>
 
@@ -117,6 +118,23 @@ void setConfig(const char *file, Config *config)
 
 	// delete the JSON object
 	cJSON_Delete(json);
+}
+
+/**
+ * Creates a UDP file descriptor and returns for use.
+ *
+ * @return sockfd file descriptor or -1 if unsuccessful
+ */
+int init_udp()
+{
+	int sockfd;
+	// Creating UDP socket file descriptor
+	if ((sockfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_IP)) < 0)
+	{
+		printf("ERROR: UDP Socket creation failed\n");
+		return -1;
+	}
+	return sockfd;
 }
 
 unsigned short checksum(const char *buf, unsigned size)

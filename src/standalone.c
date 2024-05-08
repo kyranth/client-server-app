@@ -1,15 +1,14 @@
+#define __USE_BSD		/* use bsd'ish ip header */
+#include <sys/socket.h> /* these headers are for a Linux system, but */
+#include <netinet/in.h> /* the names on other systems are easy to guess.. */
+#include <netinet/ip.h>
 #define __FAVOR_BSD /* use bsd'ish tcp header */
-#define __USE_BSD	/* use bsd'ish ip header */
+#include <netinet/tcp.h>
+#include <unistd.h>
+
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
 #include "../lib/cJSON.h"
-#include <arpa/inet.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netinet/ip.h>
-#include <netinet/tcp.h>
 #include <sys/time.h>
 
 #define DATAGRAM_LEN 4096
@@ -153,7 +152,7 @@ void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **
 
 	// required structs for IP and TCP header
 	struct iphdr *iph = (struct iphdr *)datagram;
-	struct tcphdr *tcph = (struct tcphdr *)(datagram + sizeof(struct iphdr));
+	struct tcphdr *tcph = (struct tcphdr *)(datagram + sizeof(struct tcphdr));
 	struct pseudo_header psh;
 
 	// IP header configuration

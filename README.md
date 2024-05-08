@@ -37,6 +37,9 @@ The `config.json` file should have the following structure:
 ## Usage
 1. Setup two different Virtual Machines, one for Client and one Server.
 2. Compilation: Compile the client and server source files using a C compiler (e.g., gcc).
+	
+	**Note: Must use GCC (version 7.0 or later)**
+
 - The make simplifies this process. Simply run the command below. However, compile each program on respective VMs.
 	```
 	make client
@@ -68,9 +71,9 @@ The `config.json` file should have the following structure:
 4. Docker was used to simply built the project. DO NOT use for testing purposes.
 
 ## Dependencies
-Standard C libraries
-Socket programming libraries for TCP and UDP communication
-[cJSON](https://github.com/DaveGamble/cJSON) library for parsing the config file
+- Standard C libraries
+- Socket programming libraries for TCP and UDP communication
+- [cJSON](https://github.com/DaveGamble/cJSON) by Dave Gamble library for parsing the JSON files
 
 # Limitations
 - Since the probing phase consists of UDP connections, it may lose a couple of packets.

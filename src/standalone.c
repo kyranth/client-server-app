@@ -8,13 +8,16 @@
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <netinet/udp.h>
 #include <sys/time.h>
+
+#define DATAGRAM_LEN 4096
+#define OPT_SIZE 20
 
 // Structure definition
 typedef struct
 {
 	char *server_ip_address;
+	char *client_ip_address;
 	int udp_source_port;
 	int udp_destination_port;
 	int tcp_head_syn_port;
@@ -26,6 +29,16 @@ typedef struct
 	int num_udp_packets;
 	int udp_packet_ttl;
 } Config;
+
+// pseudo header needed for tcp header checksum calculation
+struct pseudo_header
+{
+	u_int32_t source_address;
+	u_int32_t dest_address;
+	u_int8_t placeholder;
+	u_int8_t protocol;
+	u_int16_t tcp_length;
+};
 
 Config *createConfig()
 {
@@ -88,6 +101,7 @@ void setConfig(const char *file, Config *config)
 	else
 	{
 		strcpy(config->server_ip_address, cJSON_GetObjectItemCaseSensitive(json, "server_ip_address")->valuestring);
+		strcpy(config->client_ip_address, cJSON_GetObjectItemCaseSensitive(json, "client_ip_address")->valuestring);
 		config->udp_source_port = cJSON_GetObjectItemCaseSensitive(json, "udp_source_port")->valueint;
 		config->udp_destination_port = cJSON_GetObjectItemCaseSensitive(json, "udp_destination_port")->valueint;
 		config->tcp_head_syn_port = cJSON_GetObjectItemCaseSensitive(json, "tcp_head_syn_port")->valueint;
@@ -104,69 +118,277 @@ void setConfig(const char *file, Config *config)
 	cJSON_Delete(json);
 }
 
-/**
- * @brief Takes udphdr pointer and Config file to construct UDP Header
- *
- * @param udp_header pinter to struct
- * @param config configuration file
- */
-struct udphdr *fill_udp_header(struct udphdr *udp_header, Config *config)
+unsigned short checksum(const char *buf, unsigned size)
 {
-	udp_header->source = htons(config->udp_source_port);
-	udp_header->dest = htons(config->udp_destination_port);					   // TODO uint16_t
-	udp_header->len = htons(sizeof(struct udphdr) + config->udp_payload_size); // TODO uint16_t
-	udp_header->check = 0;													   // Check calculation
+	unsigned sum = 0, i;
+
+	/* Accumulate checksum */
+	for (i = 0; i < size - 1; i += 2)
+	{
+		unsigned short word16 = *(unsigned short *)&buf[i];
+		sum += word16;
+	}
+
+	/* Handle odd-sized case */
+	if (size & 1)
+	{
+		unsigned short word16 = (unsigned char)buf[i];
+		sum += word16;
+	}
+
+	/* Fold to get the ones-complement result */
+	while (sum >> 16)
+		sum = (sum & 0xFFFF) + (sum >> 16);
+
+	/* Invert to get the negative in ones-complement arithmetic */
+	return ~sum;
 }
 
-/**
- * @brief Contructs the IP Header
- *
- * @param ip_header iphdr pointer
- * @param config configuration file
- * @param cliaddr struct
- */
-void fill_ip_header(struct iphdr *ip_header, Config *config, struct sockaddr_in cliaddr)
+void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **out_packet, int *out_packet_len)
 {
-	ip_header->ihl = 5;
-	ip_header->version = 4;
-	ip_header->tos = 0;
-	ip_header->tot_len = htons(sizeof(struct iphdr) + sizeof(struct udphdr) + config->udp_payload_size);
-	ip_header->id = htons(0);				 // Can be any value
-	ip_header->frag_off = htons(0x4000);	 // Don't fragment flag
-	ip_header->ttl = config->udp_packet_ttl; // Time to live
-	ip_header->protocol = IPPROTO_UDP;
-	ip_header->check = 0;						// Checksum calculation is optional
-	ip_header->saddr = cliaddr.sin_addr.s_addr; // TODO what is this?
-	ip_header->daddr = inet_addr(config->server_ip_address);
+	// datagram to represent the packet
+	char *datagram = calloc(DATAGRAM_LEN, sizeof(char));
+
+	// required structs for IP and TCP header
+	struct iphdr *iph = (struct iphdr *)datagram;
+	struct tcphdr *tcph = (struct tcphdr *)(datagram + sizeof(struct iphdr));
+	struct pseudo_header psh;
+
+	// IP header configuration
+	iph->ihl = 5;
+	iph->version = 4;
+	iph->tos = 0;
+	iph->tot_len = sizeof(struct iphdr) + sizeof(struct tcphdr) + OPT_SIZE;
+	iph->id = htonl(rand() % 65535); // id of this packet
+	iph->frag_off = 0;
+	iph->ttl = 255;
+	iph->protocol = IPPROTO_TCP;
+	iph->check = 0; // correct calculation follows later
+	iph->saddr = src->sin_addr.s_addr;
+	iph->daddr = dst->sin_addr.s_addr;
+
+	// TCP header configuration
+	tcph->source = src->sin_port;
+	tcph->dest = dst->sin_port;
+	tcph->seq = htonl(rand() % 4294967295);
+	tcph->ack_seq = htonl(0);
+	tcph->doff = 10; // tcp header size
+	tcph->fin = 0;
+	tcph->syn = 1;
+	tcph->rst = 0;
+	tcph->psh = 0;
+	tcph->ack = 0;
+	tcph->urg = 0;
+	tcph->check = 0;			// correct calculation follows later
+	tcph->window = htons(5840); // window size
+	tcph->urg_ptr = 0;
+
+	// TCP pseudo header for checksum calculation
+	psh.source_address = src->sin_addr.s_addr;
+	psh.dest_address = dst->sin_addr.s_addr;
+	psh.placeholder = 0;
+	psh.protocol = IPPROTO_TCP;
+	psh.tcp_length = htons(sizeof(struct tcphdr) + OPT_SIZE);
+	int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + OPT_SIZE;
+	// fill pseudo packet
+	char *pseudogram = malloc(psize);
+	memcpy(pseudogram, (char *)&psh, sizeof(struct pseudo_header));
+	memcpy(pseudogram + sizeof(struct pseudo_header), tcph, sizeof(struct tcphdr) + OPT_SIZE);
+
+	// TCP options are only set in the SYN packet
+	// ---- set mss ----
+	datagram[40] = 0x02;
+	datagram[41] = 0x04;
+	int16_t mss = htons(48); // mss value
+	memcpy(datagram + 42, &mss, sizeof(int16_t));
+
+	// ---- enable SACK ----
+	datagram[44] = 0x04;
+	datagram[45] = 0x02;
+
+	// do the same for the pseudo header
+	pseudogram[32] = 0x02;
+	pseudogram[33] = 0x04;
+	memcpy(pseudogram + 34, &mss, sizeof(int16_t));
+	pseudogram[36] = 0x04;
+	pseudogram[37] = 0x02;
+
+	tcph->check = checksum((const char *)pseudogram, psize);
+	iph->check = checksum((const char *)datagram, iph->tot_len);
+
+	*out_packet = datagram;
+	*out_packet_len = iph->tot_len;
+	free(pseudogram);
 }
 
-/**
- * @brief Send UDP Packet
- *
- * @param sockfd socket file descriptor
- * @param config file struct
- * @param servaddr address struct
- */
-void send_udp_packet(int sockfd, Config *config, struct sockaddr_in servaddr, char *source_ip, char *dest_ip, uint16_t source_port, uint16_t dest_port, uint16_t packet_id, char *payload, uint16_t payload_size)
+void send_udp_packets(Config *config)
 {
-	char buffer[PACKET_SIZE];
-	struct iphdr *ip_header = (struct iphdr *)buffer;
-	struct udphdr *udp_header = (struct udphdr *)(buffer + sizeof(struct iphdr));
-	char *packet_payload = buffer + sizeof(struct iphdr) + sizeof(struct udphdr);
+	int sockfd = init_udp();
 
-	// Fill IP header
-	fill_ip_header(ip_header, config, servaddr);
+	struct sockaddr_in cliaddr, servaddr;
+	cliaddr.sin_family = AF_INET;
+	cliaddr.sin_port = htons(config->udp_source_port);
 
-	// Fill UDP header
-	fill_udp_header(udp_header, config);
+	servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
+	servaddr.sin_port = htons(config->udp_destination_port);
+	printf("UDP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));
 
-	// Fill packet payload
-	*(uint16_t *)packet_payload = htons(packet_id);
-	memcpy(packet_payload + sizeof(uint16_t), payload, payload_size - sizeof(uint16_t));
+	// UDP Bind
+	if (bind(sockfd, (struct sockaddr *)&cliaddr, sizeof(cliaddr)) < 0)
+	{
+		p_error("ERROR: Bind failed\n");
+	}
 
-	// Calculate IP checksum
-	ip_header->check = checksum((unsigned short *)buffer, sizeof(struct iphdr));
+	// variable to hold num packets and payload size from config file
+	int num_packets = config->num_udp_packets;
+	size_t payload_size = (size_t)(config->udp_payload_size - sizeof(uint16_t));
 
-	// Send packet
-	sendto(sockfd, buffer, sizeof(struct iphdr) + sizeof(struct udphdr) + payload_size, 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+	// UDP packet structure
+	typedef struct
+	{
+		unsigned short packet_id;
+		char payload[payload_size - 2];
+	} UDP_Packet;
+
+	UDP_Packet low_packet;
+
+	// Generate low entropy payload data (all 0s)
+	memset(low_packet.payload, 0, payload_size);
+
+	// Send low entropy data packet
+	printf("Sending Packet Train...\n");
+	for (int i = 0; i < num_packets; ++i)
+	{
+		// Prepare packet payload with packet ID
+		low_packet.packet_id = (unsigned short)i;
+
+		// Send
+		sendto(sockfd, &low_packet, sizeof(low_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+
+		// Wait to prevent sending packets too fast
+		usleep(200);
+	}
+}
+
+void recv_rst_packet(int sockfd, struct sockaddr_in src, struct iphdr *ip_header, struct timeval delta)
+{
+	char buffer[1048];
+	struct timeval first, last;
+	// Bind socket
+	if (bind(sockfd, (struct sockaddr *)&src, sizeof(src)) < 0)
+	{
+		p_error("ERROR: Bind failed\n");
+	}
+
+	// Listen for connections
+	if (listen(sockfd, 5) < 0)
+	{
+		p_error("ERROR: Listen failed\n");
+	}
+
+	// Accept incoming connection
+	socklen_t len = sizeof(src);
+	int connfd;
+	if ((connfd = accept(sockfd, (struct sockaddr *)&src, &len)) < 0)
+	{
+		p_error("ERROR: Accept failed\n");
+	}
+
+	ssize_t recv_len;
+	int rst_packets_received = 0;
+
+	// Listen for RST packets
+	gettimeofday(&first, NULL);
+	while (rst_packets_received < 2)
+	{
+		if (recv(sockfd, buffer, sizeof(buffer), 0) < 0)
+		{
+			printf("ERROR: Recv failed\n");
+			break;
+		}
+		else
+		{
+			struct tcphdr *tcp_header = (struct tcphdr *)(buffer + (ip_header->ihl * 4));
+			if (tcp_header->rst)
+			{
+				printf("Received RST packet\n");
+				rst_packets_received++;
+			}
+		}
+	}
+	gettimeofday(&last, NULL);
+	delta.tv_sec = last.tv_sec - first.tv_sec;
+}
+
+int main(int argc, char *argv[])
+{
+	/** Check for command line arguments */
+	if (argc < 1)
+	{
+		printf("Error: Expected (1) argument config.json file\n");
+		exit(0);
+	}
+	char *config_file = argv[1]; // Get config file from command line
+
+	// Initialize a config structure to NULL values
+	Config *config = createConfig();
+
+	/** Read the config file for server IP and fill it with JSON data */
+	setConfig(config_file, config);
+
+	// variable to hold num packets and payload size from config file
+	int num_packets = config->num_udp_packets;
+	size_t payload_size = (size_t)(config->udp_payload_size - sizeof(uint16_t));
+
+	int sockfd;
+	// Create socket
+	if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+	{
+		p_error("ERROR: Failed to create socket\n");
+	}
+
+	// Set socket options
+	const int on = 1;
+	if (setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
+	{
+		p_error("ERROR: Failed to set socket options\n");
+	}
+
+	struct timeval timeout;
+	timeout.tv_sec = 60;
+	timeout.tv_usec = 0;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
+	{
+		p_error("setsockopt (receive timeout) failed");
+	}
+
+	// Set server address
+	struct sockaddr_in servaddr;
+	servaddr.sin_family = AF_INET;
+	servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
+
+	// Set client address
+	struct sockaddr_in cliaddr;
+	servaddr.sin_family = AF_INET;
+	cliaddr.sin_addr.s_addr = inet_addr(config->client_ip_address);
+
+	// send SYN
+	char *packet;
+	int packet_len;
+	create_syn_packet(&cliaddr, &servaddr, &packet, &packet_len);
+
+	// send SYN packet to port X
+	if (sendto(sockfd, packet, packet_len, 0, (struct sockaddr *)&servaddr, sizeof(struct sockaddr)) == -1)
+	{
+		p_error("ERROR: Send failed\n");
+	}
+	else
+	{
+		printf("Successfully sent SYN packet!\n");
+	}
+
+	// Multi-threaded listen and send packets
+
+	// close connections
+	close(sockfd);
 }

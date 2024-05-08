@@ -12,7 +12,7 @@ OBJECTS=cJSON.o
 lib=lib
 src=src
 
-$(TARGET): $(OBJECTS) client server
+$(TARGET): $(OBJECTS) client server standalone
 
 cJSON.o: $(lib)/cJSON.c $(lib)/cJSON.h
 	$(CC) $(CFLAGS) -c $(lib)/cJSON.c
@@ -23,8 +23,11 @@ client: $(src)/client.c
 server: $(src)/server.c
 	$(CC) $(CFLAGS) -o server $(src)/server.c $(OBJECTS)
 
+standalone:
+	$(CC) $(CFLAGS) -o standalone $(src)/standalone.c $(OBJECTS)
+
 clean:
-	rm -f *.o *.so client server recv_config.json
+	rm -f *.o *.so client server standalone recv_config.json
 
 run:
 	./client config.json

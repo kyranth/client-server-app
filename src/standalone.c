@@ -1,3 +1,5 @@
+#define __FAVOR_BSD /* use bsd'ish tcp header */
+#define __USE_BSD	/* use bsd'ish ip header */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -342,7 +344,7 @@ int main(int argc, char *argv[])
 
 	int sockfd;
 	// Create socket
-	if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_RAW)) < 0)
+	if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP)) < 0)
 	{
 		p_error("ERROR: Failed to create socket\n");
 	}

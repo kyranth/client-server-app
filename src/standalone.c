@@ -362,24 +362,25 @@ int main(int argc, char *argv[])
 
 	int sockfd;
 	// Create socket
-	if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP)) < 0)
+	if ((sockfd = socket(PF_INET, SOCK_RAW, IPPROTO_TCP)) < 0)
 	{
 		p_error("ERROR: Failed to create socket\n");
 	}
 
-	// Set socket options
+	// Set socket options for RAW Sockets
 	const int on = 1;
 	if (setsockopt(sockfd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0)
 	{
 		p_error("ERROR: Failed to set socket options\n");
 	}
 
+	// Set timeout
 	struct timeval timeout;
 	timeout.tv_sec = 60;
 	timeout.tv_usec = 0;
 	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
 	{
-		p_error("setsockopt (receive timeout) failed");
+		p_error("ERROR: setsockopt timeout failed\n");
 	}
 
 	// Set server address
@@ -392,12 +393,12 @@ int main(int argc, char *argv[])
 	servaddr.sin_family = AF_INET;
 	cliaddr.sin_addr.s_addr = inet_addr(config->client_ip_address);
 
-	// send SYN
+	// Send SYN
 	char *packet;
 	int packet_len;
 	create_syn_packet(&cliaddr, &servaddr, &packet, &packet_len);
 
-	// send SYN packet to port X
+	// Send SYN packet to port X
 	if (sendto(sockfd, packet, packet_len, 0, (struct sockaddr *)&servaddr, sizeof(struct sockaddr)) == -1)
 	{
 		p_error("ERROR: Send failed\n");

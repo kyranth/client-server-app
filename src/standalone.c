@@ -52,7 +52,8 @@ Config *createConfig()
 	}
 
 	// Assuming IPv4 address, so 15 characters + null terminator
-	config->server_ip_address = malloc(16 * sizeof(char));
+	config->server_ip_address = (char *)malloc(16 * sizeof(char));
+	config->client_ip_address = (char *)malloc(16 * sizeof(char));
 
 	if (config->server_ip_address == NULL)
 	{

@@ -1,19 +1,21 @@
-#define __USE_BSD		/* use bsd'ish ip header */
-#include <sys/socket.h> /* these headers are for a Linux system, but */
-#include <netinet/in.h> /* the names on other systems are easy to guess.. */
-#include <linux/ip.h>
-#define __FAVOR_BSD /* use bsd'ish tcp header */
-#include <linux/tcp.h>
-#include <unistd.h>
-
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #include <string.h>
+#include <time.h>
 #include "../lib/cJSON.h"
+
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <pthread.h>
 #include <sys/time.h>
 
-#define DATAGRAM_LEN 4096
 #define OPT_SIZE 20
+
+// Function prototype for the thread function
+void *recv_rst_packet(void *arg);
 
 // Structure definition
 typedef struct
@@ -42,6 +44,11 @@ struct pseudo_header
 	u_int16_t tcp_length;
 };
 
+/**
+ * @brief Creates and allocates memory to the config structure.
+ *
+ * @return pointer to config struture
+ */
 Config *createConfig()
 {
 	Config *config = (Config *)malloc(sizeof(Config));
@@ -64,6 +71,9 @@ Config *createConfig()
 	return config;
 }
 
+/**
+ * @brief Prints error message and terminates program
+ */
 void p_error(const char *msg)
 {
 	perror(msg);
@@ -166,8 +176,11 @@ unsigned short checksum(const char *buf, unsigned size)
 
 void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **out_packet, int *out_packet_len)
 {
-	// datagram to represent the packet
-	char *datagram = calloc(DATAGRAM_LEN, sizeof(char));
+	/* Datagram to represent the packet this buffer will contain ip header, tcp header,
+	and payload. we'll point an ip header structure
+	at its beginning, and a tcp header structure after
+	that to write the header values into it */
+	char datagram[4096];
 
 	// required structs for IP and TCP header
 	struct iphdr *iph = (struct iphdr *)datagram;
@@ -210,6 +223,7 @@ void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **
 	psh.protocol = IPPROTO_TCP;
 	psh.tcp_length = htons(sizeof(struct tcphdr) + OPT_SIZE);
 	int psize = sizeof(struct pseudo_header) + sizeof(struct tcphdr) + OPT_SIZE;
+
 	// fill pseudo packet
 	char *pseudogram = malloc(psize);
 	memcpy(pseudogram, (char *)&psh, sizeof(struct pseudo_header));
@@ -290,46 +304,40 @@ void send_udp_packets(Config *config)
 	}
 }
 
-void recv_rst_packet(int sockfd, struct sockaddr_in src, struct iphdr *ip_header, struct timeval delta)
+typedef struct
 {
+	int sockfd;
+	struct sockaddr_in listenaddr;
+	struct timeval *delta;
+} recv_config;
+
+void *recv_rst_packet(void *arg)
+{
+	recv_config *settings = (recv_config *)arg;
+
 	char buffer[1048];
+
+	// Time variables
 	struct timeval first, last;
-	// Bind socket
-	if (bind(sockfd, (struct sockaddr *)&src, sizeof(src)) < 0)
-	{
-		p_error("ERROR: Bind failed\n");
-	}
-
-	// Listen for connections
-	if (listen(sockfd, 5) < 0)
-	{
-		p_error("ERROR: Listen failed\n");
-	}
-
-	// Accept incoming connection
-	socklen_t len = sizeof(src);
-	int connfd;
-	if ((connfd = accept(sockfd, (struct sockaddr *)&src, &len)) < 0)
-	{
-		p_error("ERROR: Accept failed\n");
-	}
-
-	ssize_t recv_len;
-	int rst_packets_received = 0;
 
 	// Listen for RST packets
 	gettimeofday(&first, NULL);
+
+	// Recv variables
+	int rst_packets_received = 0;
 	while (rst_packets_received < 2)
 	{
-		if (recv(sockfd, buffer, sizeof(buffer), 0) < 0)
+		int len = sizeof(settings->listenaddr);
+		if (recvfrom(settings->sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&settings->listenaddr, &len) < 0)
 		{
-			printf("ERROR: Recv failed\n");
+			printf("ERROR: recvfrom() failed\n");
 			break;
 		}
 		else
 		{
-			struct tcphdr *tcp_header = (struct tcphdr *)(buffer + (ip_header->ihl * 4));
-			if (tcp_header->rst)
+			struct iphdr *ip = (struct iphdr *)buffer;
+			struct tcphdr *tcp = (struct tcphdr *)(buffer + sizeof(struct iphdr));
+			if (tcp->rst)
 			{
 				printf("Received RST packet\n");
 				rst_packets_received++;
@@ -337,7 +345,7 @@ void recv_rst_packet(int sockfd, struct sockaddr_in src, struct iphdr *ip_header
 		}
 	}
 	gettimeofday(&last, NULL);
-	delta.tv_sec = last.tv_sec - first.tv_sec;
+	settings->delta->tv_sec = last.tv_sec - first.tv_sec;
 }
 
 int main(int argc, char *argv[])
@@ -356,11 +364,9 @@ int main(int argc, char *argv[])
 	/** Read the config file for server IP and fill it with JSON data */
 	setConfig(config_file, config);
 
-	// variable to hold num packets and payload size from config file
-	int num_packets = config->num_udp_packets;
-	size_t payload_size = (size_t)(config->udp_payload_size - sizeof(uint16_t));
-
+	/* <------------- Socket Setup -------------> */
 	int sockfd;
+
 	// Create socket
 	if ((sockfd = socket(PF_INET, SOCK_RAW, IPPROTO_TCP)) < 0)
 	{
@@ -383,22 +389,25 @@ int main(int argc, char *argv[])
 		p_error("ERROR: setsockopt timeout failed\n");
 	}
 
+	/* <------------- End of socket Setup -------------> */
+
 	// Set server address
 	struct sockaddr_in servaddr;
-	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
+	servaddr.sin_port = htons(config->tcp_head_syn_port);
 
 	// Set client address
 	struct sockaddr_in cliaddr;
-	servaddr.sin_family = AF_INET;
 	cliaddr.sin_addr.s_addr = inet_addr(config->client_ip_address);
+	cliaddr.sin_port = htons(config->tcp_head_syn_port);
 
-	// Send SYN
 	char *packet;
 	int packet_len;
+
+	// Create SYN packet
 	create_syn_packet(&cliaddr, &servaddr, &packet, &packet_len);
 
-	// Send SYN packet to port X
+	// Send head SYN packet to port X
 	if (sendto(sockfd, packet, packet_len, 0, (struct sockaddr *)&servaddr, sizeof(struct sockaddr)) == -1)
 	{
 		p_error("ERROR: Send failed\n");
@@ -409,6 +418,21 @@ int main(int argc, char *argv[])
 	}
 
 	// Multi-threaded listen and send packets
+	struct timeval delta;
+	pthread_t listen;
+
+	recv_config *listen_addr;
+	listen_addr->sockfd = sockfd;
+	listen_addr->listenaddr = cliaddr;
+	listen_addr->delta = &delta;
+
+	// Listen for rst packets on different thread
+	pthread_create(&listen, NULL, recv_rst_packet, listen_addr);
+
+	// Send udp in main thread
+	send_udp_packets(config);
+
+	pthread_join(listen, NULL);
 
 	// close connections
 	close(sockfd);

@@ -428,7 +428,7 @@ int main(int argc, char *argv[])
 	int sockfd;
 
 	// Create socket
-	if ((sockfd = socket(PF_INET, SOCK_RAW, IPPROTO_TCP)) < 0)
+	if ((sockfd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP)) < 0)
 	{
 		p_error("ERROR: Failed to create socket\n");
 	}
@@ -443,11 +443,15 @@ int main(int argc, char *argv[])
 
 	// Set server address
 	struct sockaddr_in servaddr;
+	memset(&servaddr, 0, sizeof(servaddr));
+	servaddr.sin_family = AF_INET;
 	servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
 	servaddr.sin_port = htons(config->tcp_head_syn_port);
 
 	// Set client address
 	struct sockaddr_in cliaddr;
+	memset(&cliaddr, 0, sizeof(cliaddr));
+	cliaddr.sin_family = AF_INET;
 	cliaddr.sin_addr.s_addr = inet_addr(config->client_ip_address);
 	cliaddr.sin_port = htons(config->tcp_head_syn_port);
 

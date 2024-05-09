@@ -17,10 +17,10 @@ $(TARGET): $(OBJECTS) client server standalone
 cJSON.o: $(lib)/cJSON.c $(lib)/cJSON.h
 	$(CC) $(CFLAGS) -c $(lib)/cJSON.c
 
-client: $(src)/client.c
+client: $(src)/client.c $(OBJECTS)
 	$(CC) $(CFLAGS) -o client $(src)/client.c $(OBJECTS)
 
-server: $(src)/server.c
+server: $(src)/server.c $(OBJECTS)
 	$(CC) $(CFLAGS) -o server $(src)/server.c $(OBJECTS)
 
 standalone: $(src)/standalone.c $(OBJECTS)

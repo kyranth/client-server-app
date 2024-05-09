@@ -97,7 +97,7 @@ The `config.json` file should have the following structure:
 - Since the probing phase consists of UDP connections, it may lose a couple of packets.
 - Unfortunately the program can't do the following:
 	- It can't set TTL from config file, due to scope issue
-	- 
+	- Although, the implementation is there. It can't send the SYN head packet due to "Address family not support by protocol", hence the entire part 2 doesn't work.
 - The `lib` directory holds the libraries required for this project. Although, some custom headers file might exist there to spread the project over multiple files, it's not yet implemented due to time limitations.
 
 ## Findings 

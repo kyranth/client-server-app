@@ -394,7 +394,7 @@ void *recv_rst_packet(void *arg)
 	high.tv_usec = t4.tv_usec - t3.tv_usec;
 
 	delta.tv_usec = high.tv_usec - low.tv_usec;
-	if (delta.tv_usec < 100)
+	if (delta.tv_usec < 100000) // 100 ms
 	{
 		printf("No compression detected!\n");
 	}

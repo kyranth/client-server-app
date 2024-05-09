@@ -365,7 +365,7 @@ int main(int argc, char *argv[])
 
     struct timeval delta;
     delta.tv_usec = high.tv_usec - low.tv_usec;
-    if (delta.tv_usec > 100)
+    if (delta.tv_usec > 100000) // 100 ms
     {
         char compression[] = {"Compression detected!"};
         send(connfd, compression, strlen(compression), 0);

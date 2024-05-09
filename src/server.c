@@ -306,7 +306,7 @@ int main(int argc, char *argv[])
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
 
-    low.tv_sec = last.tv_sec - first.tv_sec;
+    low.tv_usec = last.tv_usec - first.tv_usec;
 
     // [2] Receive high entropy data
     UDP_Packet high_packet;
@@ -329,7 +329,7 @@ int main(int argc, char *argv[])
     }
     gettimeofday(&last, NULL); // Record the last packet arrival time
     close(sockfd);
-    high.tv_sec = last.tv_sec - first.tv_sec;
+    high.tv_usec = last.tv_usec - first.tv_usec;
 
     /** --------- End of Probing Phase --------- */
     /** --------- Post-Probing Phase: Check for compression and Send findings --------- */
@@ -359,11 +359,13 @@ int main(int argc, char *argv[])
         p_error("ERROR: Accept failed\n");
     }
 
-    printf("Delta Low Entropy: %ld\n", low.tv_sec);
-    printf("Delta High Entropy: %ld\n", high.tv_sec);
-    printf("D_High - D_Low: %ld\n", high.tv_sec - low.tv_sec);
+    printf("Delta Low Entropy: %ld\n", low.tv_usec);
+    printf("Delta High Entropy: %ld\n", high.tv_usec);
+    printf("D_High - D_Low: %ld\n", high.tv_usec - low.tv_usec);
 
-    if ((high.tv_sec - low.tv_sec) > config->inter_measurement_time)
+    struct timeval delta;
+    delta.tv_usec = high.tv_usec - low.tv_usec;
+    if (delta.tv_usec > 100)
     {
         char compression[] = {"Compression detected!"};
         send(connfd, compression, strlen(compression), 0);

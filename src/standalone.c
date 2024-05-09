@@ -9,6 +9,7 @@
 #include <sys/socket.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <linux/tcp.h>
 #include <pthread.h>
 #include <sys/time.h>
 
@@ -174,7 +175,7 @@ unsigned short checksum(const char *buf, unsigned size)
 	return ~sum;
 }
 
-void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **out_packet, int *out_packet_len)
+void send_syn(int sockfd, struct sockaddr_in *src, struct sockaddr_in *dst, int port)
 {
 	/* Datagram to represent the packet this buffer will contain ip header, tcp header,
 	and payload. we'll point an ip header structure
@@ -201,8 +202,8 @@ void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **
 	iph->daddr = dst->sin_addr.s_addr;
 
 	// TCP header configuration
-	tcph->source = src->sin_port;
-	tcph->dest = dst->sin_port;
+	tcph->source = htons(port);
+	tcph->dest = htons(port);
 	tcph->seq = htonl(rand() % 4294967295);
 	tcph->ack_seq = htonl(0);
 	tcph->doff = 10; // tcp header size
@@ -250,12 +251,20 @@ void create_syn_packet(struct sockaddr_in *src, struct sockaddr_in *dst, char **
 	tcph->check = checksum((const char *)pseudogram, psize);
 	iph->check = checksum((const char *)datagram, iph->tot_len);
 
-	*out_packet = datagram;
-	*out_packet_len = iph->tot_len;
 	free(pseudogram);
+
+	// Send head SYN packet to port X
+	if (sendto(sockfd, datagram, iph->tot_len, 0, (struct sockaddr *)&dst, sizeof(struct sockaddr)) < 0)
+	{
+		p_error("ERROR: Send failed\n");
+	}
+	else
+	{
+		printf("Successfully sent SYN packet!\n");
+	}
 }
 
-void send_udp_packets(Config *config)
+void send_udp_packets(Config *config, int mode)
 {
 	int sockfd = init_udp();
 
@@ -284,20 +293,37 @@ void send_udp_packets(Config *config)
 		char payload[payload_size - 2];
 	} UDP_Packet;
 
-	UDP_Packet low_packet;
+	UDP_Packet packet;
 
-	// Generate low entropy payload data (all 0s)
-	memset(low_packet.payload, 0, payload_size);
+	// Mode for low/high entropy data
+	if (mode == 0)
+	{
+		// Generate low entropy payload data (all 0s)
+		memset(packet.payload, 0, payload_size);
+	}
+	else
+	{
+		// Get generated high entropy data (random numbers) from file
+		char rand_data[payload_size - 2];
+		FILE *random = fopen("random_file", "r");
+
+		// Read and close random file
+		fread(rand_data, 1, sizeof(rand_data), random);
+		fclose(random);
+
+		// Copy high entropy data to payload
+		memcpy(packet.payload, rand_data, payload_size);
+	}
 
 	// Send low entropy data packet
 	printf("Sending Packet Train...\n");
 	for (int i = 0; i < num_packets; ++i)
 	{
 		// Prepare packet payload with packet ID
-		low_packet.packet_id = (unsigned short)i;
+		packet.packet_id = (unsigned short)i;
 
 		// Send
-		sendto(sockfd, &low_packet, sizeof(low_packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
+		sendto(sockfd, &packet, sizeof(packet.payload), 0, (const struct sockaddr *)&servaddr, sizeof(servaddr));
 
 		// Wait to prevent sending packets too fast
 		usleep(200);
@@ -308,44 +334,78 @@ typedef struct
 {
 	int sockfd;
 	struct sockaddr_in listenaddr;
-	struct timeval *delta;
+	Config *config;
 } recv_config;
 
 void *recv_rst_packet(void *arg)
 {
 	recv_config *settings = (recv_config *)arg;
 
-	char buffer[1048];
+	int rst_count = 0;
+	char buffer[2048];
+	int recv_len;
+	// struct sockaddr_in sender_addr;
 
-	// Time variables
-	struct timeval first, last;
+	socklen_t len = sizeof(settings->listenaddr);
 
-	// Listen for RST packets
-	gettimeofday(&first, NULL);
+	struct timeval low, high, delta;
+	struct timeval t1, t2, t3, t4;
 
-	// Recv variables
-	int rst_packets_received = 0;
-	while (rst_packets_received < 2)
+	while (rst_count < 4)
 	{
-		int len = sizeof(settings->listenaddr);
-		if (recvfrom(settings->sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&settings->listenaddr, &len) < 0)
+		if ((recv_len = recvfrom(settings->sockfd, buffer, sizeof(buffer), 0, (struct sockaddr *)&settings->listenaddr, &len)) <= 0)
 		{
-			printf("ERROR: recvfrom() failed\n");
-			break;
+			p_error("Recvfrom() failed\n");
 		}
-		else
+
+		struct iphdr *ip_header = (struct iphdr *)buffer;
+		struct tcphdr *tcp_header = (struct tcphdr *)(buffer + (ip_header->ihl * 4));
+		int head_syn_port = settings->config->tcp_head_syn_port;
+		int tail_syn_port = settings->config->tcp_tail_syn_port;
+
+		if (tcp_header->rst)
 		{
-			struct iphdr *ip = (struct iphdr *)buffer;
-			struct tcphdr *tcp = (struct tcphdr *)(buffer + sizeof(struct iphdr));
-			if (tcp->rst)
+			if (ntohs(tcp_header->source) == head_syn_port && ntohs(tcp_header->dest) == head_syn_port && rst_count == 0)
 			{
-				printf("Received RST packet\n");
-				rst_packets_received++;
+				gettimeofday(&t1, NULL);
+				rst_count++;
+			}
+			else if (ntohs(tcp_header->source) == tail_syn_port && ntohs(tcp_header->dest) == tail_syn_port && rst_count == 1)
+			{
+				gettimeofday(&t2, NULL);
+				rst_count++;
+			}
+
+			else if (ntohs(tcp_header->source) == head_syn_port && ntohs(tcp_header->dest) == head_syn_port && rst_count == 2)
+			{
+				gettimeofday(&t3, NULL);
+				rst_count++;
+			}
+
+			else if (ntohs(tcp_header->source) == tail_syn_port && ntohs(tcp_header->dest) == tail_syn_port && rst_count == 3)
+			{
+				gettimeofday(&t4, NULL);
+				rst_count++;
 			}
 		}
 	}
-	gettimeofday(&last, NULL);
-	settings->delta->tv_sec = last.tv_sec - first.tv_sec;
+
+	low.tv_usec = t2.tv_usec - t1.tv_usec;
+	high.tv_usec = t4.tv_usec - t3.tv_usec;
+
+	delta.tv_usec = high.tv_usec - low.tv_usec;
+	if (delta.tv_usec < 100)
+	{
+		printf("No compression detected!\n");
+	}
+	else if (delta.tv_usec > 100)
+	{
+		printf("Compression detected!\n");
+	}
+	else
+	{
+		printf("Failed to detect due to insufficient information\n");
+	}
 }
 
 int main(int argc, char *argv[])
@@ -379,16 +439,6 @@ int main(int argc, char *argv[])
 	{
 		p_error("ERROR: Failed to set socket options\n");
 	}
-
-	// Set timeout
-	struct timeval timeout;
-	timeout.tv_sec = 60;
-	timeout.tv_usec = 0;
-	if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) < 0)
-	{
-		p_error("ERROR: setsockopt timeout failed\n");
-	}
-
 	/* <------------- End of socket Setup -------------> */
 
 	// Set server address
@@ -401,36 +451,35 @@ int main(int argc, char *argv[])
 	cliaddr.sin_addr.s_addr = inet_addr(config->client_ip_address);
 	cliaddr.sin_port = htons(config->tcp_head_syn_port);
 
-	char *packet;
-	int packet_len;
-
-	// Create SYN packet
-	create_syn_packet(&cliaddr, &servaddr, &packet, &packet_len);
-
-	// Send head SYN packet to port X
-	if (sendto(sockfd, packet, packet_len, 0, (struct sockaddr *)&servaddr, sizeof(struct sockaddr)) == -1)
-	{
-		p_error("ERROR: Send failed\n");
-	}
-	else
-	{
-		printf("Successfully sent SYN packet!\n");
-	}
-
 	// Multi-threaded listen and send packets
-	struct timeval delta;
 	pthread_t listen;
 
-	recv_config *listen_addr;
+	// Listen for rst packets on different thread
+	recv_config *listen_addr = (recv_config *)malloc(sizeof(recv_config));
 	listen_addr->sockfd = sockfd;
 	listen_addr->listenaddr = cliaddr;
-	listen_addr->delta = &delta;
-
-	// Listen for rst packets on different thread
 	pthread_create(&listen, NULL, recv_rst_packet, listen_addr);
 
-	// Send udp in main thread
-	send_udp_packets(config);
+	// Send head SYN packet
+	send_syn(sockfd, &cliaddr, &servaddr, config->tcp_head_syn_port);
+
+	// Send low entropy packet train in main thread
+	send_udp_packets(config, 0); // 0 for low
+
+	// Send tail SYN packet
+	send_syn(sockfd, &cliaddr, &servaddr, config->tcp_tail_syn_port);
+
+	sleep(config->inter_measurement_time);
+	printf("Waiting for inter measurement time...\n");
+
+	// Send head SYN packet
+	send_syn(sockfd, &cliaddr, &servaddr, config->tcp_head_syn_port);
+
+	// Send high entropy packet train in the main thread
+	send_udp_packets(config, 1); // 1 for high
+
+	// Send tail SYN packet
+	send_syn(sockfd, &cliaddr, &servaddr, config->tcp_tail_syn_port);
 
 	pthread_join(listen, NULL);
 

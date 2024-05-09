@@ -23,7 +23,7 @@ client: $(src)/client.c
 server: $(src)/server.c
 	$(CC) $(CFLAGS) -o server $(src)/server.c $(OBJECTS)
 
-standalone:
+standalone: $(src)/standalone.c $(OBJECTS)
 	$(CC) $(CFLAGS) -o standalone $(src)/standalone.c $(OBJECTS)
 
 clean:

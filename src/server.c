@@ -199,7 +199,7 @@ int main(int argc, char *argv[])
         printf("Error: Expected (1) argument Server Port\n");
         exit(0);
     }
-    int server_port = atoi(argv[1]); // Get server port from command line
+    int default_port = atoi(argv[1]); // Get server port from command line
 
     /** --------- Create socket connection --------- */
     int sockfd, connfd;
@@ -212,7 +212,11 @@ int main(int argc, char *argv[])
     memset(&servaddr, 0, sizeof(servaddr));
     servaddr.sin_family = AF_INET;
     servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    servaddr.sin_port = htons(server_port);
+    servaddr.sin_port = htons(default_port);
+
+    memset(&cliaddr, 0, sizeof(cliaddr));
+    cliaddr.sin_family = AF_INET;
+    cliaddr.sin_port = htons(default_port);
 
     // Bind TCP socket
     if (bind(sockfd, (const struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
@@ -336,6 +340,7 @@ int main(int argc, char *argv[])
 
     sockfd = init_tcp();
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
+    
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Initiating TCP Connection (%s/%d)...\n", inet_ntoa(cliaddr.sin_addr), ntohs(cliaddr.sin_port));

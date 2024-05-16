@@ -205,6 +205,11 @@ int main(int argc, char *argv[])
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_pre_probing_port);
 
+    // set client address
+    memset(&servaddr, 0, sizeof(servaddr));
+    cliaddr.sin_family = AF_INET;
+    cliaddr.sin_port = htons(config->tcp_pre_probing_port);
+
     // Enable Don't Fragment flag
     int enable = 1;
     if (setsockopt(sockfd, IPPROTO_IP, IP_MTU_DISCOVER, &enable, sizeof(enable)) < 0)
@@ -325,6 +330,7 @@ int main(int argc, char *argv[])
     // Set ip addresses and ports
     cliaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     cliaddr.sin_port = htons(config->tcp_post_probing_port);
+    
     servaddr.sin_addr.s_addr = inet_addr(config->server_ip_address);
     servaddr.sin_port = htons(config->tcp_post_probing_port);
     printf("Post Probing Phase: Starting TCP Connection with (%s/%d)...\n", inet_ntoa(servaddr.sin_addr), ntohs(servaddr.sin_port));

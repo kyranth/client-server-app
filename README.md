@@ -1,4 +1,4 @@
-# Client-Server Application README
+# Net Link Compression Detection Application
 This is a client-server application developed in C programming language. The application facilitates the compression link and communication between a client and a server over TCP and UDP connections. The main functionality involves transferring a configuration file from the client to the server over TCP, followed by the exchange of low entropy and high entropy UDP packets, with subsequent data analysis and result transmission back to the client over TCP.
 
 ## Features
